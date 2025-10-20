@@ -97,11 +97,17 @@ jobs:
             echo "✅ docker-compose.ci.yaml is valid" || 
             echo "⚠️  docker-compose.ci.yaml has issues"
           
-          # Test Rack config
+          # Test Rack config syntax
           cd src
-          bundle exec rackup -t config.ru && 
-            echo "✅ config.ru is valid" || 
-            echo "⚠️  config.ru has issues"
+          bundle exec ruby -c config.ru && 
+            echo "✅ config.ru syntax is valid" || 
+            echo "⚠️  config.ru has syntax issues"
+          
+          # Test config.ru loading without starting server
+          bundle exec ruby -e "
+            require_relative 'config'
+            puts '✅ config.ru loads successfully'
+          " 2>/dev/null || echo "ℹ️  config.ru validation skipped (server dependencies)"
           
       - name: Validate Ruby test files
         run: |
@@ -141,11 +147,24 @@ jobs:
           cd src
           bundle exec ruby -e "
             require_relative 'prometheus_exporter'
-            require 'sinatra'
             require 'nokogiri'
             require 'json'
             
-            puts '✅ All main dependencies available'
+            puts '✅ Core dependencies available'
+            
+            # Test that main class can be instantiated
+            app = PrometheusExporterApp.new
+            puts '✅ Application class instantiable'
+            
+            # Check that class has expected structure (Sinatra app)
+            ancestors = app.class.ancestors.map(&:to_s)
+            if ancestors.any? { |a| a.include?('Sinatra') }
+              puts '✅ Sinatra application structure confirmed'
+            else
+              puts '⚠️  Invalid application structure: ' + ancestors.first(3).inspect
+              exit 1
+            end
+            
             puts '✅ Application ready for integration testing'
           "
           

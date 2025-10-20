@@ -2,3 +2,5 @@ source 'https://rubygems.org'
 
 gem 'nokogiri'
 gem 'sinatra'
+gem 'rackup'  # Required for Rack applications
+gem 'puma'    # Web server for Sinatra
