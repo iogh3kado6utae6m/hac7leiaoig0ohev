@@ -1,0 +1,29 @@
+{
+  "name": "passenger-status-node",
+  "version": "2.0.4",
+  "description": "A wrapper for passenger-status that outputs data on all passenger instances or specific instances based on searching the supergroup name.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/majgis/passenger-status-node.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/majgis/passenger-status-node/issues"
+  },
+  "homepage": "https://github.com/majgis/passenger-status-node#readme",
+  "dependencies": {
+    "async": "^1.5.1",
+    "minimist": "^1.2.0",
+    "xml2json": "^0.9.0"
+  },
+  "bin": {
+    "passenger-status-node": "bin/passenger-status-node.js"
+  },
+  "devDependencies": {}
+}

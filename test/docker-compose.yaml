@@ -1,0 +1,32 @@
+version: '3'
+services:
+  passenger_with_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.with-app
+    hostname: 'passenger_with_app'
+    ports:
+    - 10254
+  passenger_without_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.without-app
+    hostname: 'passenger_without_app'
+    ports:
+    - 10254
+  passenger_with_visible_prometheus:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.with-visible-prometheus-app
+    hostname: 'passenger_with_visible_prometheus'
+    ports:
+    - 10254
+  test:
+    image: "phusion/passenger-ruby32:2.5.1"
+    command: ["/src/test/run_all_tests.sh"]
+    links:
+    - passenger_with_app
+    - passenger_without_app
+    - passenger_with_visible_prometheus
+    volumes:
+    - ../:/src
