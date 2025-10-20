@@ -171,7 +171,6 @@ The new `/monitus/passenger-status-native_prometheus` endpoint has comprehensive
 
 - **Unit Tests**: Logic validation without Docker (`passenger_native_prometheus_unit_test.rb`)
 - **Integration Tests**: Full HTTP endpoint testing (`passenger_native_prometheus_test.rb`) 
-- **Comparison Tests**: Format validation against existing endpoint (`passenger_native_prometheus_comparison_test.rb`)
 - **Format Compliance**: Prometheus exposition format validation
 
 ### Troubleshooting
