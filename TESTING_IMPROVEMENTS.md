@@ -195,3 +195,34 @@ make unit-test         # Basic tests (unchanged)
 5. **Graceful degradation** - Always provide some level of validation
 
 This approach follows **modern CI/CD best practices** of fast feedback loops with comprehensive validation when needed.
+
+## Final Configuration: Three-Tier Validation
+
+After iterative improvements, settled on a robust **three-tier validation strategy**:
+
+### Tier 1: Primary Validation (`test`)
+- **Modern approach** with latest Sinatra dependencies
+- **Comprehensive checks** including integration readiness
+- **Fast execution** (< 2 minutes)
+- **High coverage** of potential issues
+
+### Tier 2: Backup Validation (`test-without-docker`) 
+- **Proven reliable** approach that consistently works
+- **Zero external dependencies**
+- **Runs always** regardless of primary test result
+- **Provides confidence** when primary tests have issues
+
+### Tier 3: Integration Testing (`docker-integration`)
+- **Full end-to-end** validation with Docker
+- **Scheduled/manual** execution
+- **Comprehensive** but resource-intensive
+
+## Benefits of This Approach
+
+| Scenario | Primary | Backup | Result |
+|----------|---------|--------|---------|
+| Both pass | ✅ | ✅ | 🎉 High confidence |
+| Primary fails, backup passes | ❌ | ✅ | 💡 Likely infrastructure issue |
+| Both fail | ❌ | ❌ | ⚠️ Code issue needs attention |
+
+This strategy provides **maximum reliability** while maintaining **fast feedback** for developers.

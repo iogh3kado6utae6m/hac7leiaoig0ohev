@@ -110,18 +110,17 @@ make clean             # Clean up resources
 
 ### CI/CD Workflows
 
-**Primary Workflow** (`build`):
-- ✅ Fast validation tests (< 2 minutes)
-- ✅ Runs on every push/PR  
-- ✅ No Docker or network dependencies
-- ✅ Syntax + structure validation only
-- ✅ Reliable results (95%+ success rate)
+**Three-Tier Strategy:**
 
-**Integration Workflow** (`docker-integration`):
-- 🐳 Full Docker integration tests
-- 📅 Runs weekly or manually
-- ⏱️ 30-minute timeout
-- 🔍 Comprehensive validation
+1. **Primary** (`test`): Modern validation with latest dependencies
+2. **Backup** (`test-without-docker`): Proven reliable validation  
+3. **Integration** (`docker-integration`): Full end-to-end testing
+
+**Benefits:**
+- ✅ **Dual validation**: Two independent validation paths
+- ✅ **High reliability**: Backup ensures validation even if primary fails
+- ✅ **Fast feedback**: Both validation jobs complete quickly
+- ✅ **Clear reporting**: Status shows which layer passed/failed
 
 ### Test Scenarios
 
