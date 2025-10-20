@@ -38,6 +38,14 @@ integration-test: build
 	docker compose run --rm test
 	@echo "Integration tests completed!"
 
+integration-test-ci: build
+	@echo "Running CI integration tests..."
+	docker compose -f docker-compose.ci.yaml up -d passenger_with_app passenger_without_app passenger_with_visible_prometheus
+	sleep 10
+	docker compose -f docker-compose.ci.yaml run --rm test
+	docker compose -f docker-compose.ci.yaml down
+	@echo "CI integration tests completed!"
+
 test: syntax-check unit-test integration-test
 
 clean:

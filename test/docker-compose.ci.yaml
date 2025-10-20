@@ -1,3 +1,6 @@
+# Docker Compose configuration for CI environments
+# Uses more lenient settings for unstable test environments
+
 services:
   passenger_with_app:
     build:
@@ -6,12 +9,6 @@ services:
     hostname: 'passenger_with_app'
     ports:
       - "10254"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 45s
     networks:
       - test_network
       
@@ -22,12 +19,6 @@ services:
     hostname: 'passenger_without_app'
     ports:
       - "10254"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 45s
     networks:
       - test_network
       
@@ -38,25 +29,12 @@ services:
     hostname: 'passenger_with_visible_prometheus'
     ports:
       - "10254"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 45s
     networks:
       - test_network
       
   test:
     image: "phusion/passenger-ruby32:2.5.1"
-    command: ["/src/test/run_all_tests.sh"]
-    depends_on:
-      passenger_with_app:
-        condition: service_healthy
-      passenger_without_app:
-        condition: service_healthy
-      passenger_with_visible_prometheus:
-        condition: service_healthy
+    command: ["/src/test/run_all_tests_ci.sh"]
     volumes:
       - ../:/src
     networks:
