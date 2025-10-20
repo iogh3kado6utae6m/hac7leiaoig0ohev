@@ -71,3 +71,70 @@ its group `Prometheus exporter`.
 This project uses Docker and Docker Compose for testing. `make test` will build a test container
 with a dummy applicaton and the Prometheus Exporter and query the metric endpoint. If all goes
 well, hack along and submit a pull request.
+
+## Testing
+
+### Local Development Testing
+
+The project includes comprehensive testing capabilities:
+
+```bash
+# Run all tests (requires Docker)
+make test
+
+# Run syntax checks only
+make syntax-check
+
+# Run unit tests only
+make unit-test
+
+# Run integration tests only
+make integration-test
+
+# Build Docker images only
+make build
+
+# Clean up Docker resources
+make clean
+```
+
+### CI/CD Testing
+
+The GitHub Actions workflow provides multi-stage testing:
+
+1. **Syntax validation** for Ruby and Node.js code
+2. **Unit tests** without external dependencies
+3. **Docker image building** for all test scenarios
+4. **Integration tests** using Docker Compose
+5. **Fallback testing** without Docker if needed
+
+### Test Scenarios
+
+Three Docker test scenarios are available:
+
+- `passenger_with_app` - Tests with a dummy application running
+- `passenger_without_app` - Tests with only the monitor application
+- `passenger_with_visible_prometheus` - Tests with Prometheus metrics visible
+
+### Troubleshooting
+
+If Docker is not available, you can still run basic validation:
+
+```bash
+cd test
+make syntax-check
+make unit-test
+```
+
+For development debugging:
+
+```bash
+# Get shell access to test container
+make shell-test
+
+# View service logs
+make logs
+
+# Check service status
+make status
+```

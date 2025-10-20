@@ -1,4 +1,3 @@
-version: '3'
 services:
   passenger_with_app:
     build:
@@ -6,27 +5,64 @@ services:
       dockerfile: test/dockerfiles/Dockerfile.with-app
     hostname: 'passenger_with_app'
     ports:
-    - 10254
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/monitus/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test_network
+      
   passenger_without_app:
     build:
       context: ../
       dockerfile: test/dockerfiles/Dockerfile.without-app
     hostname: 'passenger_without_app'
     ports:
-    - 10254
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/monitus/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test_network
+      
   passenger_with_visible_prometheus:
     build:
       context: ../
       dockerfile: test/dockerfiles/Dockerfile.with-visible-prometheus-app
     hostname: 'passenger_with_visible_prometheus'
     ports:
-    - 10254
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/monitus/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - test_network
+      
   test:
     image: "phusion/passenger-ruby32:2.5.1"
     command: ["/src/test/run_all_tests.sh"]
-    links:
-    - passenger_with_app
-    - passenger_without_app
-    - passenger_with_visible_prometheus
+    depends_on:
+      passenger_with_app:
+        condition: service_healthy
+      passenger_without_app:
+        condition: service_healthy
+      passenger_with_visible_prometheus:
+        condition: service_healthy
     volumes:
-    - ../:/src
+      - ../:/src
+    networks:
+      - test_network
+    working_dir: /src
+    
+networks:
+  test_network:
+    driver: bridge

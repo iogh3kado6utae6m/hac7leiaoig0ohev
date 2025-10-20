@@ -1,24 +1,31 @@
 FROM phusion/passenger-ruby32:2.5.1
 ENV PASSENGER_DISABLE_SECURITY_UPDATE_CHECK=true HOME=/app
 WORKDIR /app
-ENTRYPOINT ["/usr/local/bin/dumb-init"]
 
+# Install dumb-init
+RUN curl -s -L -o /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_$(uname -m) \
+    && chmod +x /usr/local/bin/dumb-init
+
+ENTRYPOINT ["/usr/local/bin/dumb-init"]
 CMD ["passenger", "start", "--port", "80", "--log-file=/dev/stdout", "--nginx-config-template", "/nginx.conf.erb"]
 
+# Install bundler and configure
 RUN gem install bundler \
     && bundle config --global silence_root_warning 1
 
-COPY /src/Gemfile /monitor/Gemfile
+# Install monitor app dependencies
+COPY src/Gemfile /monitor/Gemfile
+RUN cd /monitor && bundle install
 
-RUN cd /monitor \
-    && bundle install
+# Install dummy app dependencies
+COPY test/dummy-app/Gemfile /app/Gemfile
+RUN cd /app && bundle install
 
-RUN curl -s -L -o /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_`uname -m` \
-    && chmod +x /usr/local/bin/dumb-init
+# Copy configuration and applications
+COPY test/nginx-configurations/nginx.conf-visible-prometheus.erb /nginx.conf.erb
+COPY test/dummy-app/ /app/
+COPY src/ /monitor/
 
-COPY /test/nginx-configurations/nginx.conf-visible-prometheus.erb /nginx.conf.erb
-COPY /test/dummy-app /app
-COPY /src/ /monitor/
-
-RUN cd /app \
-    && bundle install
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost/monitus/metrics || exit 1
