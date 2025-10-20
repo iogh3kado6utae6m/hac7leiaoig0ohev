@@ -79,10 +79,11 @@ well, hack along and submit a pull request.
 The project uses a **multi-layered testing approach** optimized for both speed and reliability:
 
 #### 1. Fast CI Tests (Always Run)
-- **Syntax validation** - Ruby and Node.js code
-- **Unit tests** - Core functionality without dependencies
+- **Syntax validation** - Ruby code and configurations
+- **Unit tests** - Core functionality without dependencies  
 - **Configuration validation** - Docker Compose, Rack configs
 - **Integration readiness** - Component loading verification
+- **Note**: `passenger-status-node` requires local `npm install` (development-only)
 
 #### 2. Docker Integration Tests (Local/Manual)
 - **Full integration testing** with Docker Compose

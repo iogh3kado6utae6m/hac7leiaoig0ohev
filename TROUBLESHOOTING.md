@@ -163,3 +163,27 @@ If problems persist:
 4. **Clean rebuild:** `make clean && make build`
 
 For CI/CD issues, the backup test job will still validate code correctness even if Docker integration fails.
+
+## Node.js Components
+
+### passenger-status-node
+
+The `src/passenger-status-node` utility is excluded from CI testing because:
+
+1. **Missing package-lock.json** - Required for `npm ci` in CI environments
+2. **Development-only dependency** - Not needed for core application functionality
+3. **Optional component** - Used for extended metrics, not core Prometheus export
+
+**Local Development:**
+```bash
+cd src/passenger-status-node
+npm install  # Creates package-lock.json locally
+node index.js --help
+```
+
+**CI Strategy:**
+- ✅ Focus on core Ruby application
+- ✅ Validate essential functionality
+- ⏭️ Skip optional Node.js utilities
+
+This approach ensures reliable CI while maintaining full local development capabilities.
