@@ -94,6 +94,29 @@ class PrometheusExporterApp < Sinatra::Base
     return metrics.join("\n")
   end
 
+  get '/monitus/passenger-status-native_prometheus' do
+    # Native Ruby implementation that produces the same output as /monitus/passenger-status-node_prometheus
+    # but uses passenger-status --show=json instead of the external passenger-status-node utility
+    content_type :text
+    
+    # Get passenger status as JSON
+    passenger_json = `ruby \`which passenger-status\` --show=json 2>/dev/null`
+    
+    return 'Error: Empty result' if passenger_json.empty?
+    return 'Error: Passenger not available' if passenger_json.include?('command not found')
+    
+    begin
+      passenger_data = JSON.parse(passenger_json)
+    rescue JSON::ParserError => e
+      return "Error: Invalid JSON from passenger-status: #{e.message}"
+    end
+    
+    # Convert to same format as passenger-status-node_prometheus
+    metrics = generate_passenger_node_prometheus_metrics(passenger_data)
+    
+    return metrics.join("\n")
+  end
+
   get '/monitus/passenger-status' do
     content_type :text
     result = `/usr/sbin/passenger-status --verbose`
@@ -160,6 +183,77 @@ class PrometheusExporterApp < Sinatra::Base
 
   def hide_ourselves(supergroups) # Hide the Prometheus exporter from the output
     supergroups.reject{ |s| s.xpath("name").text ==  SELF_GROUP_NAME }
+  end
+
+  private
+
+  def generate_passenger_node_prometheus_metrics(passenger_data)
+    # Convert passenger-status JSON to same format as passenger-status-node_prometheus
+    metrics = []
+    
+    # Handle single instance or array of instances
+    instances = passenger_data.is_a?(Array) ? passenger_data : [passenger_data]
+    
+    instances.each do |instance|
+      instance_name = instance['instance_name'] || instance['name'] || 'unknown'
+      
+      # Instance-level metrics
+      process_count = instance['process_count'] || (instance['supergroups'] || []).sum { |sg| (sg['group'] || {})['processes']&.length || 0 }
+      capacity_used = instance['capacity_used'] || (instance['supergroups'] || []).sum { |sg| sg['capacity_used'] || 0 }
+      wait_list_size = instance['get_wait_list_size'] || (instance['supergroups'] || []).sum { |sg| sg['get_wait_list_size'] || 0 }
+      
+      metrics << "# HELP passenger_process_count Total number of processes in instance"
+      metrics << "# TYPE passenger_process_count gauge"
+      metrics << "passenger_process_count{instance=\"#{instance_name}\"} #{process_count}"
+      
+      metrics << "# HELP passenger_capacity_used Capacity used by instance"
+      metrics << "# TYPE passenger_capacity_used gauge"
+      metrics << "passenger_capacity_used{instance=\"#{instance_name}\"} #{capacity_used}"
+      
+      metrics << "# HELP passenger_get_wait_list_size Size of get wait list in instance"
+      metrics << "# TYPE passenger_get_wait_list_size gauge"
+      metrics << "passenger_get_wait_list_size{instance=\"#{instance_name}\"} #{wait_list_size}"
+      
+      # Process supergroups
+      (instance['supergroups'] || []).each do |supergroup|
+        supergroup_name = supergroup['name'] || 'unknown'
+        
+        # Skip self (Prometheus exporter)
+        next if supergroup_name == SELF_GROUP_NAME
+        
+        metrics << "# HELP passenger_supergroup_capacity_used Capacity used by supergroup"
+        metrics << "# TYPE passenger_supergroup_capacity_used gauge"
+        metrics << "passenger_supergroup_capacity_used{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\"} #{supergroup['capacity_used'] || 0}"
+        
+        metrics << "# HELP passenger_supergroup_get_wait_list_size Size of get wait list in supergroup"
+        metrics << "# TYPE passenger_supergroup_get_wait_list_size gauge"
+        metrics << "passenger_supergroup_get_wait_list_size{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\"} #{supergroup['get_wait_list_size'] || 0}"
+        
+        # Process individual processes
+        group = supergroup['group'] || {}
+        (group['processes'] || []).each do |process|
+          pid = process['pid'] || 'unknown'
+          
+          metrics << "# HELP passenger_process_cpu CPU usage by process"
+          metrics << "# TYPE passenger_process_cpu gauge"
+          metrics << "passenger_process_cpu{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['cpu'] || 0}"
+          
+          metrics << "# HELP passenger_process_memory Memory usage by process (rss)"
+          metrics << "# TYPE passenger_process_memory gauge"
+          metrics << "passenger_process_memory{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['rss'] || process['real_memory'] || 0}"
+          
+          metrics << "# HELP passenger_process_sessions Active sessions by process"
+          metrics << "# TYPE passenger_process_sessions gauge"
+          metrics << "passenger_process_sessions{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['sessions'] || process['session'] || 0}"
+          
+          metrics << "# HELP passenger_process_processed Total requests processed by process"
+          metrics << "# TYPE passenger_process_processed counter"
+          metrics << "passenger_process_processed{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['processed'] || process['requests_processed'] || 0}"
+        end
+      end
+    end
+    
+    metrics
   end
 
   def passenger_status # Execute passenger-status and return the result as XML

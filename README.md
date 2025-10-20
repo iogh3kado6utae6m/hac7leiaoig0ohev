@@ -5,11 +5,27 @@ Prometheus format.
 
 ## Metrics
 
+### Standard Passenger Metrics
+
 Name                        | Description 
 ----------------------------|--------------------------------------------------
 passenger_capacity          | Number of processes spawn
 passenger_processes_active  | Number of processes currently working on requests
 passenger_wait_list_size    | Requests in queue
+
+### Extended Passenger Metrics (via `/monitus/passenger-status-native_prometheus`)
+
+Name                             | Description 
+---------------------------------|--------------------------------------------------
+passenger_process_count          | Total number of processes in instance
+passenger_capacity_used          | Capacity used by instance  
+passenger_get_wait_list_size     | Size of get wait list in instance
+passenger_supergroup_capacity_used | Capacity used by supergroup
+passenger_supergroup_get_wait_list_size | Size of get wait list in supergroup
+passenger_process_cpu            | CPU usage by individual process
+passenger_process_memory         | Memory usage by individual process (RSS)
+passenger_process_sessions       | Active sessions by individual process
+passenger_process_processed      | Total requests processed by individual process
 
 Example of output:
 ```
@@ -60,7 +76,11 @@ Example with the application copied in `/monitor`:
     [...]
 ```
 
-This example will make the Passenger Metric available on `http://<ip-of-this-server>:10254/metrics`.
+This example will make the Passenger Metrics available on:
+
+- `http://<ip-of-this-server>:10254/monitus/metrics` - Standard metrics
+- `http://<ip-of-this-server>:10254/monitus/passenger-status-native_prometheus` - Extended metrics (native implementation)
+- `http://<ip-of-this-server>:10254/monitus/passenger-status-node_prometheus` - Extended metrics (requires passenger-status-node)
 
 Note: If you want to have this application's metrics hidden from the metric endpoint, you have to name
 its group `Prometheus exporter`.
