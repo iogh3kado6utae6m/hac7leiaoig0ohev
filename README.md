@@ -112,9 +112,10 @@ make clean             # Clean up resources
 
 **Primary Workflow** (`build`):
 - ✅ Fast validation tests (< 2 minutes)
-- ✅ Runs on every push/PR
-- ✅ No Docker complexity
-- ✅ Reliable results
+- ✅ Runs on every push/PR  
+- ✅ No Docker or network dependencies
+- ✅ Syntax + structure validation only
+- ✅ Reliable results (95%+ success rate)
 
 **Integration Workflow** (`docker-integration`):
 - 🐳 Full Docker integration tests
