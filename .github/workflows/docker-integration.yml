@@ -1,0 +1,40 @@
+name: docker-integration
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'  # Weekly on Sunday
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  docker-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Longer timeout for Docker tests
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build Docker images
+        run: |
+          cd test
+          echo "🐳 Building Docker images..."
+          make build
+          
+      - name: Run Docker integration tests
+        run: |
+          cd test
+          echo "🗧 Running full integration tests..."
+          timeout 20m make integration-test-ci || {
+            echo "⚠️  Integration tests failed or timed out"
+            echo "Showing container logs:"
+            docker compose -f docker-compose.ci.yaml logs
+            exit 1
+          }
+          
+      - name: Cleanup
+        if: always()
+        run: |
+          cd test
+          make clean

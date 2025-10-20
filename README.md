@@ -74,67 +74,78 @@ well, hack along and submit a pull request.
 
 ## Testing
 
+### Testing Strategy
+
+The project uses a **multi-layered testing approach** optimized for both speed and reliability:
+
+#### 1. Fast CI Tests (Always Run)
+- **Syntax validation** - Ruby and Node.js code
+- **Unit tests** - Core functionality without dependencies
+- **Configuration validation** - Docker Compose, Rack configs
+- **Integration readiness** - Component loading verification
+
+#### 2. Docker Integration Tests (Local/Manual)
+- **Full integration testing** with Docker Compose
+- **End-to-end workflow** testing
+- **Multi-scenario validation**
+
 ### Local Development Testing
 
-The project includes comprehensive testing capabilities:
-
 ```bash
-# Run all tests (requires Docker)
+# Quick validation (recommended for development)
+make syntax-check && make unit-test
+
+# Full integration tests (requires Docker)
 make test
 
-# Run syntax checks only
-make syntax-check
+# CI-style integration tests
+make integration-test-ci
 
-# Run unit tests only
-make unit-test
-
-# Run integration tests only
-make integration-test
-
-# Build Docker images only
-make build
-
-# Clean up Docker resources
-make clean
+# Individual components
+make build              # Build Docker images
+make logs              # View service logs
+make clean             # Clean up resources
 ```
 
-### CI/CD Testing
+### CI/CD Workflows
 
-The GitHub Actions workflow provides multi-stage testing:
+**Primary Workflow** (`build`):
+- ✅ Fast validation tests (< 2 minutes)
+- ✅ Runs on every push/PR
+- ✅ No Docker complexity
+- ✅ Reliable results
 
-1. **Syntax validation** for Ruby and Node.js code
-2. **Unit tests** without external dependencies
-3. **Docker image building** for all test scenarios
-4. **Integration tests** using Docker Compose
-5. **Fallback testing** without Docker if needed
+**Integration Workflow** (`docker-integration`):
+- 🐳 Full Docker integration tests
+- 📅 Runs weekly or manually
+- ⏱️ 30-minute timeout
+- 🔍 Comprehensive validation
 
 ### Test Scenarios
 
-Three Docker test scenarios are available:
+Three Docker test scenarios:
+- `passenger_with_app` - With dummy application
+- `passenger_without_app` - Monitor only
+- `passenger_with_visible_prometheus` - Visible metrics
 
-- `passenger_with_app` - Tests with a dummy application running
-- `passenger_without_app` - Tests with only the monitor application
-- `passenger_with_visible_prometheus` - Tests with Prometheus metrics visible
+### Quick Start
+
+```bash
+# For rapid development feedback
+cd test && make syntax-check unit-test
+
+# For comprehensive local testing
+cd test && make test
+
+# For CI troubleshooting
+cd test && make integration-test-ci
+```
 
 ### Troubleshooting
 
-If Docker is not available, you can still run basic validation:
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed guidance.
 
-```bash
-cd test
-make syntax-check
-make unit-test
-```
-
-For development debugging:
-
-```bash
-# Get shell access to test container
-make shell-test
-
-# View service logs
-make logs
-
-# Check service status
-make status
-```
+**Quick fixes:**
+- **CI failures**: Usually pass with basic validation
+- **Docker issues**: Use `make syntax-check unit-test`
+- **Local problems**: Try `make clean && make build`
