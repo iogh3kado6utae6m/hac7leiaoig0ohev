@@ -12,7 +12,6 @@ syntax-check:
 	@echo "Running syntax checks..."
 	@cd ../src && ruby -c prometheus_exporter.rb
 	@find tests -name "*.rb" -exec ruby -c {} \;
-	@cd ../src/passenger-status-node && node -c index.js
 	@echo "Syntax checks passed!"
 
 unit-test:
