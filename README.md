@@ -160,7 +160,19 @@ cd test && make test
 
 # For CI troubleshooting
 cd test && make integration-test-ci
+
+# Test native prometheus endpoint specifically
+cd test && bundle exec ruby tests/passenger_native_prometheus_unit_test.rb
 ```
+
+### Testing the Native Prometheus Endpoint
+
+The new `/monitus/passenger-status-native_prometheus` endpoint has comprehensive test coverage:
+
+- **Unit Tests**: Logic validation without Docker (`passenger_native_prometheus_unit_test.rb`)
+- **Integration Tests**: Full HTTP endpoint testing (`passenger_native_prometheus_test.rb`) 
+- **Comparison Tests**: Format validation against existing endpoint (`passenger_native_prometheus_comparison_test.rb`)
+- **Format Compliance**: Prometheus exposition format validation
 
 ### Troubleshooting
 
