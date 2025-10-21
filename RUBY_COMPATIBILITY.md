@@ -106,9 +106,23 @@ bundle exec puma config.ru -p 4567
 
 ## Code Compatibility Notes
 
-- **Array#sum**: Replaced with `inject(0, :+)` for Ruby 2.3.8 compatibility
+- **Array#sum**: Conditional usage - `sum` for Ruby 2.4+, `inject(0, :+)` for Ruby 2.3.8
+- **Version detection**: Uses `RUBY_VERSION >= '2.4.0'` to choose appropriate methods
 - **Safe navigation operator `&.`**: Available in Ruby 2.3.0+, used carefully
 - **JSON parsing**: Uses standard `JSON.parse` available in both versions
+
+### Ruby Version-Specific Methods
+
+```ruby
+# The application automatically detects Ruby version and uses:
+def ruby_sum(array)
+  if RUBY_VERSION >= '2.4.0'
+    array.sum          # Modern Ruby (faster)
+  else
+    array.inject(0, :+) # Legacy Ruby (compatible)
+  end
+end
+```
 
 ## Docker vs Source Installation
 

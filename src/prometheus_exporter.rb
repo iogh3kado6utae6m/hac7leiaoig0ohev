@@ -187,6 +187,17 @@ class PrometheusExporterApp < Sinatra::Base
 
   private
 
+  # Ruby version-aware sum method
+  def ruby_sum(array)
+    if RUBY_VERSION >= '2.4.0'
+      # Use modern sum method for Ruby 2.4+
+      array.sum
+    else
+      # Use traditional inject for Ruby 2.3.x
+      array.inject(0, :+)
+    end
+  end
+
   def generate_passenger_node_prometheus_metrics(passenger_data)
     # Convert passenger-status JSON to same format as passenger-status-node_prometheus
     metrics = []
@@ -200,25 +211,28 @@ class PrometheusExporterApp < Sinatra::Base
       # Instance-level metrics
       supergroups = instance['supergroups'] || []
       
-      # Calculate process count (Ruby 2.3.8 compatible)
+      # Calculate process count (version-dependent method)
       process_count = instance['process_count']
       if process_count.nil?
-        process_count = supergroups.map { |sg| 
+        process_counts = supergroups.map { |sg| 
           processes = (sg['group'] || {})['processes']
           processes ? processes.length : 0
-        }.inject(0, :+)
+        }
+        process_count = ruby_sum(process_counts)
       end
       
-      # Calculate capacity used (Ruby 2.3.8 compatible)
+      # Calculate capacity used (version-dependent method)
       capacity_used = instance['capacity_used']
       if capacity_used.nil?
-        capacity_used = supergroups.map { |sg| sg['capacity_used'] || 0 }.inject(0, :+)
+        capacities = supergroups.map { |sg| sg['capacity_used'] || 0 }
+        capacity_used = ruby_sum(capacities)
       end
       
-      # Calculate wait list size (Ruby 2.3.8 compatible)
+      # Calculate wait list size (version-dependent method)
       wait_list_size = instance['get_wait_list_size']
       if wait_list_size.nil?
-        wait_list_size = supergroups.map { |sg| sg['get_wait_list_size'] || 0 }.inject(0, :+)
+        wait_sizes = supergroups.map { |sg| sg['get_wait_list_size'] || 0 }
+        wait_list_size = ruby_sum(wait_sizes)
       end
       
       metrics << "# HELP passenger_process_count Total number of processes in instance"
