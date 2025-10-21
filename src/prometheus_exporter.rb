@@ -99,8 +99,23 @@ class PrometheusExporterApp < Sinatra::Base
     # but uses passenger-status --show=json instead of the external passenger-status-node utility
     content_type :text
     
-    # Get passenger status as JSON
-    passenger_json = `ruby \`which passenger-status\` --show=json 2>/dev/null`
+    # Get passenger status - try different approaches
+    # First try to get pool status which has process info
+    passenger_json = `/usr/bin/passenger-config api-call get /pool.json 2>/dev/null`
+    
+    if passenger_json.empty? || passenger_json.include?('error')
+      # Fallback: try to parse XML status and convert to JSON-like structure
+      xml_status = `ruby \`which passenger-status\` -v --show=xml 2>/dev/null`
+      unless xml_status.empty?
+        require 'nokogiri'
+        begin
+          doc = Nokogiri::XML(xml_status) { |config| config.strict }
+          passenger_json = convert_xml_to_json_structure(doc)
+        rescue => e
+          return "Error parsing XML: #{e.message}"
+        end
+      end
+    end
     
     return 'Error: Empty result' if passenger_json.empty?
     return 'Error: Passenger not available' if passenger_json.include?('command not found')
@@ -220,6 +235,60 @@ class PrometheusExporterApp < Sinatra::Base
   end
 
   # Convert passenger-status JSON format to passenger-status-node compatible format
+  # Convert XML passenger-status to JSON-like structure similar to passenger-status-node
+  def convert_xml_to_json_structure(doc)
+    # Extract instance info from XML
+    instance_id = doc.xpath('//instance_id').first&.text || 'unknown'
+    
+    result = {
+      'instance_id' => instance_id,
+      'instance_name' => instance_id,
+      'supergroups' => []
+    }
+    
+    # Process supergroups
+    doc.xpath('//supergroups/supergroup').each do |sg|
+      supergroup_name = sg.xpath('name').text
+      
+      # Skip self (Prometheus exporter)
+      next if supergroup_name == SELF_GROUP_NAME
+      
+      sg_data = {
+        'name' => supergroup_name,
+        'capacity_used' => sg.xpath('capacity_used').text.to_i,
+        'get_wait_list_size' => sg.xpath('get_wait_list_size').text.to_i,
+        'group' => {
+          'processes' => []
+        }
+      }
+      
+      # Process individual processes in groups
+      sg.xpath('group/processes/process').each do |proc|
+        process_data = {
+          'pid' => proc.xpath('pid').text,
+          'cpu' => proc.xpath('cpu').text.to_f,
+          'rss' => proc.xpath('real_memory').text.to_i,
+          'sessions' => proc.xpath('sessions').text.to_i,
+          'processed' => proc.xpath('processed').text.to_i
+        }
+        sg_data['group']['processes'] << process_data
+      end
+      
+      result['supergroups'] << sg_data
+    end
+    
+    # Calculate instance totals (Ruby 2.3.8 compatible)
+    process_counts = result['supergroups'].map { |sg| sg['group']['processes'].length }
+    capacities = result['supergroups'].map { |sg| sg['capacity_used'] }
+    wait_lists = result['supergroups'].map { |sg| sg['get_wait_list_size'] }
+    
+    result['process_count'] = ruby_sum(process_counts)
+    result['capacity_used'] = ruby_sum(capacities)
+    result['get_wait_list_size'] = ruby_sum(wait_lists)
+    
+    JSON.generate([result])
+  end
+
   def normalize_passenger_status_data(passenger_status_data)
     # passenger-status --show=json has different structure than passenger-status-node
     # We need to transform it to match the expected format
