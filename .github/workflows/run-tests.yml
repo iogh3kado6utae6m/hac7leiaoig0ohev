@@ -9,6 +9,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby-version: ['3.2']
+      fail-fast: false
     
     steps:
       - uses: actions/checkout@v4
@@ -16,13 +20,26 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2'
-          bundler-cache: true
+          ruby-version: ${{ matrix.ruby-version }}
+          bundler-cache: false  # Disable cache for conditional dependencies
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libxml2-dev libxslt1-dev zlib1g-dev
           
       - name: Install Ruby dependencies
         run: |
           cd src
+          echo "Ruby version: $(ruby --version)"
+          
+          # Configure bundler for CI environment
+          bundle config set --local deployment false
+          bundle config set --local path 'vendor/bundle'
           bundle install --jobs 4 --retry 3
+          
+          echo "Installed gems:"
+          bundle list | head -20
           
       - name: Install test dependencies
         run: |
@@ -199,11 +216,19 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
-          bundler-cache: true
+          bundler-cache: false
+          
+      - name: Install system dependencies  
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libxml2-dev libxslt1-dev zlib1g-dev
           
       - name: Install Ruby dependencies
         run: |
           cd src
+          echo "Ruby version: $(ruby --version)"
+          bundle config set --local deployment false
+          bundle config set --local path 'vendor/bundle'
           bundle install --jobs 4 --retry 3
           
       - name: Install test dependencies

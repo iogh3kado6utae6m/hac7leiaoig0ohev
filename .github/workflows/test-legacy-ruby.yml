@@ -1,0 +1,92 @@
+name: test-legacy-ruby
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test-ruby-238:
+    runs-on: ubuntu-20.04  # Use older Ubuntu for better Ruby 2.3.8 support
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Ruby 2.3.8
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '2.3.8'
+          bundler-cache: false
+          
+      - name: Install system dependencies for Ruby 2.3.8
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libxml2-dev libxslt1-dev zlib1g-dev
+          sudo apt-get install -y ruby2.3-dev  # Ruby development headers
+          
+      - name: Install Ruby dependencies with legacy Gemfile
+        run: |
+          cd src
+          echo "Ruby version: $(ruby --version)"
+          
+          # Use legacy Gemfile for Ruby 2.3.8
+          export BUNDLE_GEMFILE=Gemfile.legacy
+          
+          bundle config set --local deployment false
+          bundle config set --local path 'vendor/bundle'
+          bundle install --jobs 2 --retry 3  # Reduced parallelism for stability
+          
+          echo "Installed gems:"
+          bundle list
+          
+      - name: Test Ruby 2.3.8 compatibility
+        run: |
+          cd src
+          export BUNDLE_GEMFILE=Gemfile.legacy
+          
+          # Basic syntax and loading tests
+          bundle exec ruby -c prometheus_exporter.rb
+          bundle exec ruby -c config.ru
+          
+          # Test application instantiation
+          bundle exec ruby -e "
+            require_relative 'prometheus_exporter'
+            app = PrometheusExporterApp.new
+            puts '✅ Application loads with Ruby 2.3.8'
+            puts 'Ruby version: ' + RUBY_VERSION
+            puts 'SELF_GROUP_NAME: ' + PrometheusExporterApp::SELF_GROUP_NAME.inspect
+          "
+          
+      - name: Test Ruby version-specific methods
+        run: |
+          cd src  
+          export BUNDLE_GEMFILE=Gemfile.legacy
+          
+          bundle exec ruby -e "
+            require_relative 'prometheus_exporter'
+            app = PrometheusExporterApp.new
+            
+            # Test ruby_sum method with Ruby 2.3.8
+            test_array = [1, 2, 3, 4, 5]
+            result = app.send(:ruby_sum, test_array)
+            expected = 15
+            
+            if result == expected
+              puts '✅ ruby_sum method works correctly with Ruby 2.3.8'
+              puts 'Result: ' + result.to_s + ' (expected: ' + expected.to_s + ')'
+            else
+              puts '❌ ruby_sum method failed'
+              puts 'Result: ' + result.to_s + ' (expected: ' + expected.to_s + ')'
+              exit 1
+            end
+          "
+          
+      - name: Report Ruby 2.3.8 test results
+        run: |
+          echo "📊 Ruby 2.3.8 Compatibility Test Results:"
+          echo "✅ Gem installation successful"
+          echo "✅ Application loading successful"
+          echo "✅ Version-specific methods working"
+          echo "🎉 Ruby 2.3.8 compatibility confirmed!"
