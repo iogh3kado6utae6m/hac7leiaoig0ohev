@@ -198,9 +198,28 @@ class PrometheusExporterApp < Sinatra::Base
       instance_name = instance['instance_name'] || instance['name'] || 'unknown'
       
       # Instance-level metrics
-      process_count = instance['process_count'] || (instance['supergroups'] || []).sum { |sg| (sg['group'] || {})['processes']&.length || 0 }
-      capacity_used = instance['capacity_used'] || (instance['supergroups'] || []).sum { |sg| sg['capacity_used'] || 0 }
-      wait_list_size = instance['get_wait_list_size'] || (instance['supergroups'] || []).sum { |sg| sg['get_wait_list_size'] || 0 }
+      supergroups = instance['supergroups'] || []
+      
+      # Calculate process count (Ruby 2.3.8 compatible)
+      process_count = instance['process_count']
+      if process_count.nil?
+        process_count = supergroups.map { |sg| 
+          processes = (sg['group'] || {})['processes']
+          processes ? processes.length : 0
+        }.inject(0, :+)
+      end
+      
+      # Calculate capacity used (Ruby 2.3.8 compatible)
+      capacity_used = instance['capacity_used']
+      if capacity_used.nil?
+        capacity_used = supergroups.map { |sg| sg['capacity_used'] || 0 }.inject(0, :+)
+      end
+      
+      # Calculate wait list size (Ruby 2.3.8 compatible)
+      wait_list_size = instance['get_wait_list_size']
+      if wait_list_size.nil?
+        wait_list_size = supergroups.map { |sg| sg['get_wait_list_size'] || 0 }.inject(0, :+)
+      end
       
       metrics << "# HELP passenger_process_count Total number of processes in instance"
       metrics << "# TYPE passenger_process_count gauge"

@@ -98,10 +98,17 @@ bundle exec puma config.ru -p 4567
 
 ## Development Notes
 
-- The application code itself is compatible with both Ruby versions
+- The application code is compatible with both Ruby versions
+- Code uses Ruby 2.3.8 compatible methods (e.g., `inject` instead of `sum`)
 - Only gem dependencies need version management
 - Testing is primarily done on Ruby 3.2, but basic functionality works on 2.3.8
 - For production, Ruby 3.2+ is recommended for security and performance
+
+## Code Compatibility Notes
+
+- **Array#sum**: Replaced with `inject(0, :+)` for Ruby 2.3.8 compatibility
+- **Safe navigation operator `&.`**: Available in Ruby 2.3.0+, used carefully
+- **JSON parsing**: Uses standard `JSON.parse` available in both versions
 
 ## Docker vs Source Installation
 
