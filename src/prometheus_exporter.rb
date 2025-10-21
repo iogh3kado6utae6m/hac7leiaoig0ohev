@@ -111,8 +111,20 @@ class PrometheusExporterApp < Sinatra::Base
       return "Error: Invalid JSON from passenger-status: #{e.message}"
     end
     
+    # Debug: check if normalization is working
+    if params['debug'] == '1'
+      return "Original data keys: #{passenger_data.keys.inspect}\n" +
+             "Original data: #{passenger_data.inspect}\n\n" +
+             "Calling normalize_passenger_status_data...\n"
+    end
+    
     # Convert passenger-status JSON format to passenger-status-node format
     normalized_data = normalize_passenger_status_data(passenger_data)
+    
+    # Debug: check normalized data
+    if params['debug'] == '2'
+      return "Normalized data: #{normalized_data.inspect}\n"
+    end
     
     # Convert to same format as passenger-status-node_prometheus
     metrics = generate_passenger_node_prometheus_metrics(normalized_data)
@@ -212,38 +224,57 @@ class PrometheusExporterApp < Sinatra::Base
     # passenger-status --show=json has different structure than passenger-status-node
     # We need to transform it to match the expected format
     
-    # Extract instance information
-    instance_name = passenger_status_data['instance_id'] || 'unknown'
+    # Try different possible instance ID fields
+    instance_name = passenger_status_data['instance_id'] || 
+                   passenger_status_data['instance_name'] ||
+                   passenger_status_data['server_name'] ||
+                   passenger_status_data['name'] ||
+                   'unknown'
     
-    # Convert supergroups structure
+    # Convert supergroups structure - try different possible locations
+    raw_supergroups = passenger_status_data['supergroups'] || 
+                     passenger_status_data['applications'] ||
+                     passenger_status_data['groups'] ||
+                     []
+    
     supergroups = []
-    if passenger_status_data['supergroups']
-      passenger_status_data['supergroups'].each do |sg|
-        normalized_sg = {
-          'name' => sg['name'],
-          'capacity_used' => sg['capacity_used'] || 0,
-          'get_wait_list_size' => sg['get_wait_list_size'] || 0,
-          'group' => {
-            'processes' => []
-          }
+    raw_supergroups.each do |sg|
+      # Skip self (Prometheus exporter) to match original behavior
+      next if sg['name'] == SELF_GROUP_NAME
+      
+      normalized_sg = {
+        'name' => sg['name'] || sg['app_root'] || 'unknown',
+        'capacity_used' => (sg['capacity_used'] || sg['capacity'] || sg['processes_spawned'] || 0).to_i,
+        'get_wait_list_size' => (sg['get_wait_list_size'] || sg['queue_size'] || sg['waiting'] || 0).to_i,
+        'group' => {
+          'processes' => []
         }
-        
-        # Convert processes if they exist
-        if sg['group'] && sg['group']['processes']
-          sg['group']['processes'].each do |process|
-            normalized_process = {
-              'pid' => process['pid'],
-              'cpu' => process['cpu'] || 0,
-              'rss' => process['rss'] || process['real_memory'] || 0,
-              'sessions' => process['sessions'] || process['session'] || 0,
-              'processed' => process['processed'] || process['requests_processed'] || 0
-            }
-            normalized_sg['group']['processes'] << normalized_process
-          end
-        end
-        
-        supergroups << normalized_sg
+      }
+      
+      # Convert processes - try different possible locations
+      raw_processes = nil
+      if sg['group'] && sg['group']['processes']
+        raw_processes = sg['group']['processes']
+      elsif sg['processes']
+        raw_processes = sg['processes']
+      elsif sg['group']
+        raw_processes = sg['group']
       end
+      
+      if raw_processes && raw_processes.is_a?(Array)
+        raw_processes.each do |process|
+          normalized_process = {
+            'pid' => (process['pid'] || process['process_id'] || 'unknown').to_s,
+            'cpu' => (process['cpu'] || process['cpu_usage'] || 0).to_f,
+            'rss' => (process['rss'] || process['real_memory'] || process['memory'] || 0).to_i,
+            'sessions' => (process['sessions'] || process['session'] || process['active_sessions'] || 0).to_i,
+            'processed' => (process['processed'] || process['requests_processed'] || process['request_count'] || 0).to_i
+          }
+          normalized_sg['group']['processes'] << normalized_process
+        end
+      end
+      
+      supergroups << normalized_sg
     end
     
     # Calculate totals
