@@ -1,6 +1,12 @@
 source 'https://rubygems.org'
 
-gem 'nokogiri'
-gem 'sinatra'
-gem 'rackup'  # Required for Rack applications
-gem 'puma'    # Web server for Sinatra
+# Dependencies compatible with Ruby 2.3.8+ and Ruby 3.2+
+gem 'nokogiri', '~> 1.10.0'  # Last version supporting Ruby 2.3.8
+gem 'sinatra', '~> 2.0.0'    # Compatible with Ruby 2.3.8
+gem 'rack', '~> 2.0.0'       # Core dependency for both versions
+gem 'puma', '~> 3.12.0'      # Compatible with Ruby 2.3.8
+
+# For Ruby 2.4+ only (rackup as separate gem)
+if RUBY_VERSION >= '2.4'
+  gem 'rackup'
+end
