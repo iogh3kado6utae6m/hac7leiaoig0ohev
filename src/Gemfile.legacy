@@ -1,0 +1,13 @@
+# Gemfile for Ruby 2.3.8 - use with BUNDLE_GEMFILE=Gemfile.legacy
+source 'https://rubygems.org'
+
+ruby '2.3.8'
+
+# Legacy-compatible versions
+gem 'nokogiri', '~> 1.10.10'  # Last version supporting Ruby 2.3.8
+gem 'sinatra', '~> 2.0.8'     # Compatible with Ruby 2.3.8
+gem 'rack', '~> 2.0.9'        # Core dependency
+gem 'puma', '~> 3.12.6'       # Compatible with Ruby 2.3.8
+gem 'json', '~> 2.3.1'        # May be needed for older Ruby
+
+# rackup functionality is built into rack for Ruby 2.3.8

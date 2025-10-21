@@ -11,6 +11,14 @@ Monitus supports multiple Ruby versions for running from sources.
 
 ### Installation
 
+**Option 1: Using legacy Gemfile (recommended)**
+```bash
+cd src/
+BUNDLE_GEMFILE=Gemfile.legacy bundle install
+BUNDLE_GEMFILE=Gemfile.legacy bundle exec puma config.ru -p 4567
+```
+
+**Option 2: Using main Gemfile (auto-detection)**
 ```bash
 cd src/
 bundle install
@@ -66,13 +74,14 @@ bundle exec puma config.ru -p 4567
 
 ## Dependency Versions
 
-| Gem | Ruby 2.3.8 | Ruby 3.2+ | Notes |
-|-----|------------|-----------|-------|
-| nokogiri | ~> 1.10.0 | Latest | Last version supporting Ruby 2.3.8 |
-| sinatra | ~> 2.0.0 | Latest | Stable 2.x series |
-| rack | ~> 2.0.0 | Latest | Core dependency |
-| puma | ~> 3.12.0 | Latest | Last 3.x supporting Ruby 2.3.8 |
-| rackup | N/A | Latest | Not available in Ruby 2.3.8 |
+| Gem | Ruby 2.3.8 | Ruby 2.4-2.7 | Ruby 3.0+ | Notes |
+|-----|------------|---------------|-----------|-------|
+| nokogiri | ~> 1.10.10 | ~> 1.11.0 | >= 1.12.0 | Version compatibility |
+| sinatra | ~> 2.0.8 | ~> 2.1.0 | ~> 2.2.0 | Progressive versions |
+| rack | ~> 2.0.9 | ~> 2.1.0 | >= 2.2.0 | Core dependency |
+| puma | ~> 3.12.6 | ~> 4.3.0 | >= 5.0.0 | Server compatibility |
+| rackup | N/A | Yes | Yes | Separate gem for 2.4+ |
+| net-ftp | N/A | N/A | Required | Ruby 3.1+ needs explicit gem |
 
 ## Troubleshooting
 
@@ -83,12 +92,17 @@ bundle exec puma config.ru -p 4567
 - rackup functionality is built into rack gem in Ruby 2.3.8
 
 **Gem installation errors**
-- Ensure you have development headers: `apt-get install ruby-dev`
-- For nokogiri: `apt-get install libxml2-dev libxslt1-dev`
+- Ensure you have development headers: `apt-get install ruby-dev build-essential`
+- For nokogiri: `apt-get install libxml2-dev libxslt1-dev zlib1g-dev`
+- Use legacy Gemfile: `BUNDLE_GEMFILE=Gemfile.legacy bundle install`
 
 **"cannot load such file -- rackup"**
 - This is expected in Ruby 2.3.8
 - Use rack directly or puma as shown above
+
+**Nokogiri compilation errors**
+- Use legacy Gemfile with compatible version
+- Install system dependencies: `apt-get install build-essential patch`
 
 ### Modern Ruby Issues
 
