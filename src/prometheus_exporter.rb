@@ -95,41 +95,28 @@ class PrometheusExporterApp < Sinatra::Base
   end
 
   get '/monitus/passenger-status-native_prometheus' do
-    # Native Ruby implementation that produces the same output as /monitus/passenger-status-node_prometheus
-    # but uses passenger-status --show=json instead of the external passenger-status-node utility
+    # Native Ruby implementation that reproduces passenger-status-node logic
+    # 1. Get instance names from passenger-status
+    # 2. Get XML data for each instance 
+    # 3. Parse and convert to same JSON structure as passenger-status-node
     content_type :text
     
-    # Get passenger status with verbose flag to include process details
-    passenger_json = `ruby \`which passenger-status\` -v --show=json 2>/dev/null`
-    
-    return 'Error: Empty result' if passenger_json.empty?
-    return 'Error: Passenger not available' if passenger_json.include?('command not found')
-    
     begin
-      passenger_data = JSON.parse(passenger_json)
-    rescue JSON::ParserError => e
-      return "Error: Invalid JSON from passenger-status: #{e.message}"
+      # Step 1: Get instance names (same logic as passenger-status-node getNames function)
+      instances_data = get_passenger_instances
+      
+      if params['debug'] == '1'
+        return "Instances data: #{instances_data.inspect}\n"
+      end
+      
+      # Step 2: Convert to same format as passenger-status-node_prometheus
+      metrics = generate_passenger_node_prometheus_metrics(instances_data)
+      
+      return metrics.join("\n")
+      
+    rescue => e
+      return "Error: #{e.message}"
     end
-    
-    # Debug: check if normalization is working
-    if params['debug'] == '1'
-      return "Original data keys: #{passenger_data.keys.inspect}\n" +
-             "Original data: #{passenger_data.inspect}\n\n" +
-             "Calling normalize_passenger_status_data...\n"
-    end
-    
-    # Convert passenger-status JSON format to passenger-status-node format
-    normalized_data = normalize_passenger_status_data(passenger_data)
-    
-    # Debug: check normalized data
-    if params['debug'] == '2'
-      return "Normalized data: #{normalized_data.inspect}\n"
-    end
-    
-    # Convert to same format as passenger-status-node_prometheus
-    metrics = generate_passenger_node_prometheus_metrics(normalized_data)
-    
-    return metrics.join("\n")
   end
 
   get '/monitus/passenger-status' do
@@ -220,6 +207,134 @@ class PrometheusExporterApp < Sinatra::Base
   end
 
   # Convert passenger-status JSON format to passenger-status-node compatible format
+
+  # Reproduce passenger-status-node logic
+  def get_passenger_instances
+    # Step 1: Get instance names (reproduce getNames function)
+    instance_names = get_instance_names
+    
+    # Step 2: Get metrics for each instance (reproduce getInstanceMetrics)
+    instances = []
+    
+    if instance_names.empty?
+      # Single instance case - get data without instance name
+      xml_data = `ruby \`which passenger-status\` --show=xml -v 2>/dev/null`
+      unless xml_data.empty?
+        instances << parse_passenger_xml(xml_data, 'default')
+      end
+    else
+      # Multiple instances case
+      instance_names.each do |name|
+        xml_data = `ruby \`which passenger-status\` --show=xml -v #{name} 2>/dev/null`
+        unless xml_data.empty?
+          instances << parse_passenger_xml(xml_data, name)
+        end
+      end
+    end
+    
+    instances.compact
+  end
+  
+  # Reproduce getNames function from passenger-status-node
+  def get_instance_names
+    status_output = `ruby \`which passenger-status\` 2>/dev/null`
+    return [] if status_output.empty?
+    
+    # Check if multiple instances (error condition in JS code)
+    if status_output.include?('ERROR') || status_output.include?('Multiple')
+      # Parse multiple instance names from output
+      lines = status_output.split("\n")
+      names = []
+      lines.each do |line|
+        if line.match(/^[a-zA-Z0-9_]+$/)
+          names << line.strip
+        end
+      end
+      return names
+    else
+      # Single instance case - extract instance name
+      match = status_output.match(/Instance: *([a-zA-Z0-9_]*)/)
+      return match ? [match[1]] : []
+    end
+  end
+  
+  # Parse XML and convert to JSON structure (reproduce parseXML + reformat)
+  def parse_passenger_xml(xml_data, instance_name)
+    doc = Nokogiri::XML(xml_data) { |config| config.strict }
+    
+    # Extract info section (like obj.info in JS)
+    info = doc.xpath('//info').first
+    return nil unless info
+    
+    result = {
+      'name' => instance_name,
+      'instance_name' => instance_name
+    }
+    
+    # Add instance-level data
+    %w[instance_id process_count capacity_used get_wait_list_size].each do |field|
+      element = info.xpath(field).first
+      result[field] = element ? element.text : nil
+    end
+    
+    # Process supergroups (reproduce reformat function logic)
+    supergroups = []
+    info.xpath('supergroups/supergroup').each do |sg|
+      supergroup_name = sg.xpath('name').text
+      
+      # Skip self (reproduce original behavior)
+      next if supergroup_name == SELF_GROUP_NAME
+      
+      sg_data = {
+        'name' => supergroup_name,
+        'capacity_used' => sg.xpath('capacity_used').text.to_i,
+        'get_wait_list_size' => sg.xpath('get_wait_list_size').text.to_i,
+        'group' => {
+          'processes' => []
+        }
+      }
+      
+      # Process individual processes
+      sg.xpath('group/processes/process').each do |proc|
+        process_data = {
+          'pid' => proc.xpath('pid').text,
+          'cpu' => proc.xpath('cpu').text.to_f,
+          'rss' => proc.xpath('real_memory').text.to_i,
+          'sessions' => proc.xpath('sessions').text.to_i,
+          'processed' => proc.xpath('processed').text.to_i
+        }
+        sg_data['group']['processes'] << process_data
+      end
+      
+      supergroups << sg_data
+    end
+    
+    result['supergroups'] = supergroups
+    
+    # Calculate totals if not present
+    unless result['process_count']
+      process_counts = supergroups.map { |sg| sg['group']['processes'].length }
+      result['process_count'] = ruby_sum(process_counts)
+    else
+      result['process_count'] = result['process_count'].to_i
+    end
+    
+    unless result['capacity_used']
+      capacities = supergroups.map { |sg| sg['capacity_used'] }
+      result['capacity_used'] = ruby_sum(capacities)
+    else
+      result['capacity_used'] = result['capacity_used'].to_i
+    end
+    
+    unless result['get_wait_list_size']
+      wait_lists = supergroups.map { |sg| sg['get_wait_list_size'] }
+      result['get_wait_list_size'] = ruby_sum(wait_lists)
+    else
+      result['get_wait_list_size'] = result['get_wait_list_size'].to_i
+    end
+    
+    result
+  end
 
   def normalize_passenger_status_data(passenger_status_data)
     # passenger-status --show=json has different structure than passenger-status-node
