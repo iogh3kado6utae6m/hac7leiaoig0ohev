@@ -1,3 +1,5 @@
+SHELL := /usr/bin/bash
+
 .PHONY: all clean test build run
 
 all clean test build run:

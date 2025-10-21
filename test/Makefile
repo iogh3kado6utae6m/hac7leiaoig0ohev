@@ -1,3 +1,5 @@
+SHELL := /usr/bin/bash
+
 .PHONY: clean test build run check-docker syntax-check unit-test integration-test
 .PHONY: passenger_with_app passenger_without_app passenger_with_visible_prometheus
 
