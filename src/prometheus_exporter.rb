@@ -111,8 +111,11 @@ class PrometheusExporterApp < Sinatra::Base
       return "Error: Invalid JSON from passenger-status: #{e.message}"
     end
     
+    # Convert passenger-status JSON format to passenger-status-node format
+    normalized_data = normalize_passenger_status_data(passenger_data)
+    
     # Convert to same format as passenger-status-node_prometheus
-    metrics = generate_passenger_node_prometheus_metrics(passenger_data)
+    metrics = generate_passenger_node_prometheus_metrics(normalized_data)
     
     return metrics.join("\n")
   end
@@ -145,6 +148,12 @@ class PrometheusExporterApp < Sinatra::Base
     content_type :json
     result = `/usr/bin/passenger-config api-call get /pool.json`
     return result
+  end
+
+  get '/monitus/debug-passenger-status-json' do
+    content_type :json
+    passenger_json = `ruby \`which passenger-status\` --show=json 2>/dev/null`
+    return passenger_json
   end
 
   get '/monitus/passenger-config_api-call_get_server' do
@@ -196,6 +205,65 @@ class PrometheusExporterApp < Sinatra::Base
       # Use traditional inject for Ruby 2.3.x
       array.inject(0, :+)
     end
+  end
+
+  # Convert passenger-status JSON format to passenger-status-node compatible format
+  def normalize_passenger_status_data(passenger_status_data)
+    # passenger-status --show=json has different structure than passenger-status-node
+    # We need to transform it to match the expected format
+    
+    # Extract instance information
+    instance_name = passenger_status_data['instance_id'] || 'unknown'
+    
+    # Convert supergroups structure
+    supergroups = []
+    if passenger_status_data['supergroups']
+      passenger_status_data['supergroups'].each do |sg|
+        normalized_sg = {
+          'name' => sg['name'],
+          'capacity_used' => sg['capacity_used'] || 0,
+          'get_wait_list_size' => sg['get_wait_list_size'] || 0,
+          'group' => {
+            'processes' => []
+          }
+        }
+        
+        # Convert processes if they exist
+        if sg['group'] && sg['group']['processes']
+          sg['group']['processes'].each do |process|
+            normalized_process = {
+              'pid' => process['pid'],
+              'cpu' => process['cpu'] || 0,
+              'rss' => process['rss'] || process['real_memory'] || 0,
+              'sessions' => process['sessions'] || process['session'] || 0,
+              'processed' => process['processed'] || process['requests_processed'] || 0
+            }
+            normalized_sg['group']['processes'] << normalized_process
+          end
+        end
+        
+        supergroups << normalized_sg
+      end
+    end
+    
+    # Calculate totals
+    process_counts = supergroups.map { |sg| (sg['group']['processes'] || []).length }
+    capacities = supergroups.map { |sg| sg['capacity_used'] || 0 }
+    wait_lists = supergroups.map { |sg| sg['get_wait_list_size'] || 0 }
+    
+    total_processes = ruby_sum(process_counts)
+    total_capacity = ruby_sum(capacities)
+    total_wait_list = ruby_sum(wait_lists)
+    
+    # Return in passenger-status-node compatible format
+    [{
+      'name' => instance_name,
+      'instance_name' => instance_name,
+      'process_count' => total_processes,
+      'capacity_used' => total_capacity,
+      'get_wait_list_size' => total_wait_list,
+      'supergroups' => supergroups
+    }]
   end
 
   def generate_passenger_node_prometheus_metrics(passenger_data)
