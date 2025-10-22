@@ -250,7 +250,8 @@ passenger_process_cpu{instance="passenger_with_app",supergroup="/app (developmen
    - Always runs regardless of primary result
 
 3. **Integration** (`docker-integration`)
-   - Scheduled/manual execution
+   - **Scheduled**: Every Sunday at 6:00 UTC (`cron: '0 6 * * 0'`)
+   - **Manual**: Available via GitHub Actions "Run workflow" button
    - Full end-to-end validation
    - Extended timeout (30 minutes)
 
@@ -261,6 +262,15 @@ passenger_process_cpu{instance="passenger_with_app",supergroup="/app (developmen
 | Both pass | ✅ | ✅ | High confidence |
 | Primary fails, backup passes | ❌ | ✅ | Likely infrastructure issue |
 | Both fail | ❌ | ❌ | Code issue needs attention |
+
+### Docker Integration Schedule
+
+The `docker-integration` workflow may show "This workflow has no runs yet" for these reasons:
+
+- **Weekly schedule**: Runs only on Sundays at 6:00 UTC
+- **Recent addition**: Workflow was added October 20, 2025
+- **Manual trigger available**: Go to GitHub Actions → docker-integration → "Run workflow"
+- **Local testing**: Always available via `make test` in the `test/` directory
 
 ## Troubleshooting
 

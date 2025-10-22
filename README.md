@@ -157,13 +157,18 @@ make clean             # Clean up resources
 
 1. **Primary** (`test`): Modern validation with latest dependencies
 2. **Backup** (`test-without-docker`): Proven reliable validation  
-3. **Integration** (`docker-integration`): Full end-to-end testing
+3. **Integration** (`docker-integration`): Full end-to-end testing (weekly on Sundays, 6:00 UTC + manual)
 
 **Benefits:**
 - ✅ **Dual validation**: Two independent validation paths
 - ✅ **High reliability**: Backup ensures validation even if primary fails
 - ✅ **Fast feedback**: Both validation jobs complete quickly
 - ✅ **Clear reporting**: Status shows which layer passed/failed
+
+> **ℹ️ Note**: The `docker-integration` workflow runs weekly and may show "This workflow has no runs yet" if:
+> - Recently added to the project (less than a week ago)
+> - No Sunday has passed since the workflow was created
+> - No manual runs have been triggered via GitHub Actions UI
 
 ### Test Scenarios
 

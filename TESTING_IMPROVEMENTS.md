@@ -141,9 +141,9 @@ After analyzing CI timeout issues, implemented a **two-tier testing approach**:
 **Philosophy**: "Full end-to-end validation when needed"
 
 **Triggers**:
-- Weekly scheduled runs
-- Manual dispatch
-- Before releases
+- **Weekly scheduled**: Every Sunday at 6:00 UTC (`cron: '0 6 * * 0'`)
+- **Manual dispatch**: Via GitHub Actions UI
+- **Before releases**: Manual trigger recommended
 
 **Benefits**:
 - 🐳 Full Docker integration testing
