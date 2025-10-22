@@ -79,6 +79,7 @@ Example with the application copied in `/monitor`:
 This example will make the Passenger Metrics available on:
 
 - `http://<ip-of-this-server>:10254/monitus/metrics` - Standard metrics
+- `http://<ip-of-this-server>:10254/monitus/passenger-status-prometheus` - Extended metrics (native implementation, short name)
 - `http://<ip-of-this-server>:10254/monitus/passenger-status-native_prometheus` - Extended metrics (native implementation)
 - `http://<ip-of-this-server>:10254/monitus/passenger-status-node_prometheus` - Extended metrics (requires passenger-status-node)
 

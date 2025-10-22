@@ -119,6 +119,32 @@ class PrometheusExporterApp < Sinatra::Base
     end
   end
 
+  get '/monitus/passenger-status-prometheus' do
+    # Clone of passenger-status-native_prometheus endpoint with shorter name
+    # Native Ruby implementation that reproduces passenger-status-node logic
+    # 1. Get instance names from passenger-status
+    # 2. Get XML data for each instance 
+    # 3. Parse and convert to same JSON structure as passenger-status-node
+    content_type :text
+    
+    begin
+      # Step 1: Get instance names (same logic as passenger-status-node getNames function)
+      instances_data = get_passenger_instances
+      
+      if params['debug'] == '1'
+        return "Instances data: #{instances_data.inspect}\n"
+      end
+      
+      # Step 2: Convert to same format as passenger-status-node_prometheus
+      metrics = generate_passenger_node_prometheus_metrics(instances_data)
+      
+      return metrics.join("\n")
+      
+    rescue => e
+      return "Error: #{e.message}"
+    end
+  end
+
   get '/monitus/passenger-status' do
     content_type :text
     result = `/usr/sbin/passenger-status --verbose`
