@@ -116,4 +116,99 @@ describe "passenger status prometheus endpoint" do
     assert_equal("200", response.code, "Should return HTTP 200")
     assert_match(/text/, response.content_type, "Should return text content type")
   end
+
+  it "should support instance parameter filtering" do
+    # First, get full response to identify an instance name
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus"))
+    
+    # Extract instance name from metrics
+    instance_match = response.match(/instance="([^"]+)"/)
+    skip "No instance found in metrics" unless instance_match
+    
+    instance_name = instance_match[1]
+    
+    # Test filtering by instance
+    filtered_response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?instance=#{instance_name}"))
+    
+    # Should contain metrics only for the specified instance
+    assert_includes(filtered_response, "instance=\"#{instance_name}\"")
+    
+    # Should still be valid Prometheus format
+    assert_includes(filtered_response, "# HELP")
+    assert_includes(filtered_response, "# TYPE")
+  end
+
+  it "should support supergroup parameter filtering" do
+    # First, get full response to identify a supergroup name
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus"))
+    
+    # Extract supergroup name from metrics
+    supergroup_match = response.match(/supergroup="([^"]+)"/)
+    skip "No supergroup found in metrics" unless supergroup_match
+    
+    supergroup_name = supergroup_match[1]
+    
+    # Test filtering by supergroup
+    filtered_response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?supergroup=#{URI.encode_www_form_component(supergroup_name)}"))
+    
+    # Should contain metrics only for the specified supergroup
+    if filtered_response.include?("supergroup=")
+      assert_includes(filtered_response, "supergroup=\"#{supergroup_name}\"")
+    end
+    
+    # Should still be valid Prometheus format  
+    assert_includes(filtered_response, "# HELP")
+    assert_includes(filtered_response, "# TYPE")
+  end
+
+  it "should support pid parameter filtering" do
+    # First, get full response to identify a PID
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus"))
+    
+    # Extract PID from metrics
+    pid_match = response.match(/pid="([^"]+)"/)
+    skip "No PID found in metrics" unless pid_match
+    
+    pid = pid_match[1]
+    
+    # Test filtering by PID
+    filtered_response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?pid=#{pid}"))
+    
+    # Should contain metrics only for the specified PID
+    if filtered_response.include?("pid=")
+      assert_includes(filtered_response, "pid=\"#{pid}\"")
+    end
+    
+    # Should still be valid Prometheus format
+    assert_includes(filtered_response, "# HELP")
+    assert_includes(filtered_response, "# TYPE")
+  end
+
+  it "should reject multiple filter parameters" do
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?instance=test&supergroup=test"))
+    
+    # Should return error message
+    assert_includes(response, "Error:")
+    assert_includes(response.downcase, "only one filter parameter")
+  end
+
+  it "should handle non-existent filter values gracefully" do
+    # Test with non-existent instance
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?instance=nonexistent"))
+    
+    # Should return valid response (even if empty metrics)
+    refute_includes(response, "Error:", "Should not return error for non-existent instance")
+    
+    # Test with non-existent supergroup
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?supergroup=nonexistent"))
+    
+    # Should return valid response (even if empty metrics)
+    refute_includes(response, "Error:", "Should not return error for non-existent supergroup")
+    
+    # Test with non-existent PID
+    response = Net::HTTP.get(URI("http://passenger_with_app:10254/monitus/passenger-status-prometheus?pid=99999"))
+    
+    # Should return valid response (even if empty metrics)
+    refute_includes(response, "Error:", "Should not return error for non-existent PID")
+  end
 end

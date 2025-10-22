@@ -83,6 +83,28 @@ This example will make the Passenger Metrics available on:
 - `http://<ip-of-this-server>:10254/monitus/passenger-status-native_prometheus` - Extended metrics (native implementation)
 - `http://<ip-of-this-server>:10254/monitus/passenger-status-node_prometheus` - Extended metrics (requires passenger-status-node)
 
+### Filtering Extended Metrics
+
+The `/monitus/passenger-status-prometheus` endpoint supports filtering to show metrics for specific components only. Only one filter parameter is allowed per request:
+
+- `?instance=<name>` - Show metrics only for the specified Passenger instance
+- `?supergroup=<name>` - Show metrics only for the specified application/supergroup across all instances
+- `?pid=<process_id>` - Show metrics only for the specified process across all supergroups and instances
+
+**Examples:**
+```bash
+# Get metrics for a specific instance
+curl http://localhost:10254/monitus/passenger-status-prometheus?instance=default
+
+# Get metrics for a specific application
+curl http://localhost:10254/monitus/passenger-status-prometheus?supergroup=/app
+
+# Get metrics for a specific process
+curl http://localhost:10254/monitus/passenger-status-prometheus?pid=12345
+```
+
+**Note:** Multiple filter parameters in a single request will result in an error.
+
 Note: If you want to have this application's metrics hidden from the metric endpoint, you have to name
 its group `Prometheus exporter`.
 

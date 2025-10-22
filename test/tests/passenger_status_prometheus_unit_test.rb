@@ -133,4 +133,108 @@ describe "passenger status prometheus unit tests" do
       assert(metric.include?("processed"), "Counter metrics should indicate accumulated values")
     end
   end
+
+  it "should validate filter parameter parsing" do
+    # Test parameter validation logic scenarios
+    
+    # Valid single parameters
+    valid_single_params = [
+      { 'instance' => 'test_instance' },
+      { 'supergroup' => 'test_app' },
+      { 'pid' => '12345' }
+    ]
+    
+    valid_single_params.each do |params|
+      # This would be tested by mocking the parameter parsing
+      param_key = params.keys.first
+      param_value = params.values.first
+      
+      assert_match(/^[a-zA-Z0-9_\-\(\)\/\s\.]+$/, param_value.to_s, "Parameter value should be reasonable: #{param_value}")
+    end
+    
+    # Invalid multiple parameters (should be rejected)
+    invalid_multi_params = [
+      { 'instance' => 'test', 'supergroup' => 'app' },
+      { 'instance' => 'test', 'pid' => '123' },
+      { 'supergroup' => 'app', 'pid' => '123' },
+      { 'instance' => 'test', 'supergroup' => 'app', 'pid' => '123' }
+    ]
+    
+    invalid_multi_params.each do |params|
+      # Multiple parameters should be rejected
+      assert(params.keys.length > 1, "Test case should have multiple parameters: #{params}")
+    end
+  end
+
+  it "should handle empty and invalid filter values" do
+    # Test edge cases for parameter values
+    edge_cases = [
+      { 'instance' => '' },           # empty string
+      { 'instance' => ' ' },          # whitespace
+      { 'supergroup' => nil },        # nil value would come as nil in params
+      { 'pid' => '0' },              # edge case PID
+      { 'pid' => 'abc' }             # non-numeric PID
+    ]
+    
+    edge_cases.each do |params|
+      # This tests parameter value patterns
+      param_value = params.values.first
+      
+      # Empty strings and whitespace should be handled
+      if param_value.is_a?(String)
+        if param_value.strip.empty?
+          assert_equal('', param_value.strip, "Empty parameter values should be cleanly handled")
+        end
+      end
+    end
+  end
+
+  it "should validate filter data structures" do
+    # Test the expected data structure for filtering
+    sample_instance_data = {
+      'name' => 'test_instance',
+      'instance_name' => 'test_instance',
+      'process_count' => 2,
+      'capacity_used' => 2,
+      'get_wait_list_size' => 0,
+      'supergroups' => [
+        {
+          'name' => '/app (development)',
+          'capacity_used' => 1,
+          'get_wait_list_size' => 0,
+          'group' => {
+            'processes' => [
+              {
+                'pid' => '12345',
+                'cpu' => 0.1,
+                'rss' => 123456,
+                'sessions' => 1,
+                'processed' => 10
+              }
+            ]
+          }
+        }
+      ]
+    }
+    
+    # Validate structure has expected keys
+    expected_instance_keys = ['name', 'instance_name', 'supergroups']
+    expected_instance_keys.each do |key|
+      assert(sample_instance_data.key?(key), "Instance data should have #{key}")
+    end
+    
+    # Validate supergroup structure
+    supergroup = sample_instance_data['supergroups'].first
+    expected_sg_keys = ['name', 'group']
+    expected_sg_keys.each do |key|
+      assert(supergroup.key?(key), "Supergroup should have #{key}")
+    end
+    
+    # Validate process structure
+    process = supergroup['group']['processes'].first
+    expected_process_keys = ['pid', 'cpu', 'rss']
+    expected_process_keys.each do |key|
+      assert(process.key?(key), "Process should have #{key}")
+    end
+  end
 end

@@ -120,22 +120,31 @@ class PrometheusExporterApp < Sinatra::Base
   end
 
   get '/monitus/passenger-status-prometheus' do
-    # Clone of passenger-status-native_prometheus endpoint with shorter name
-    # Native Ruby implementation that reproduces passenger-status-node logic
-    # 1. Get instance names from passenger-status
-    # 2. Get XML data for each instance 
-    # 3. Parse and convert to same JSON structure as passenger-status-node
+    # Extended endpoint with filtering support
+    # Query parameters:
+    #   ?instance=name - show only specified instance
+    #   ?supergroup=name - show only specified supergroup across all instances  
+    #   ?pid=123 - show only specified process across all supergroups
+    # Only one parameter allowed at a time
     content_type :text
     
     begin
-      # Step 1: Get instance names (same logic as passenger-status-node getNames function)
+      # Parse and validate filter parameters
+      filter_params = parse_filter_parameters(params)
+      
+      # Get instance data
       instances_data = get_passenger_instances
       
       if params['debug'] == '1'
-        return "Instances data: #{instances_data.inspect}\n"
+        return "Instances data: #{instances_data.inspect}\nFilter params: #{filter_params.inspect}\n"
       end
       
-      # Step 2: Convert to same format as passenger-status-node_prometheus
+      # Apply filtering if parameters provided
+      if filter_params.any?
+        instances_data = filter_instances_data(instances_data, filter_params)
+      end
+      
+      # Generate metrics from filtered data
       metrics = generate_passenger_node_prometheus_metrics(instances_data)
       
       return metrics.join("\n")
@@ -217,6 +226,117 @@ class PrometheusExporterApp < Sinatra::Base
 
   def hide_ourselves(supergroups) # Hide the Prometheus exporter from the output
     supergroups.reject{ |s| s.xpath("name").text ==  SELF_GROUP_NAME }
+  end
+
+  # Filter instances data based on query parameters
+  def filter_instances_data(instances_data, filter_params)
+    return instances_data if filter_params.empty?
+    
+    filtered_instances = []
+    
+    instances_data.each do |instance|
+      filtered_instance = instance.dup
+      
+      # Apply instance filter
+      if filter_params[:instance]
+        next unless (instance['instance_name'] || instance['name']) == filter_params[:instance]
+      end
+      
+      # Apply supergroup filter  
+      if filter_params[:supergroup]
+        filtered_supergroups = (instance['supergroups'] || []).select do |sg|
+          sg['name'] == filter_params[:supergroup]
+        end
+        filtered_instance['supergroups'] = filtered_supergroups
+        
+        # Recalculate instance totals after supergroup filtering
+        if filtered_supergroups.any?
+          process_counts = filtered_supergroups.map { |sg| 
+            processes = (sg['group'] || {})['processes']
+            processes ? processes.length : 0
+          }
+          filtered_instance['process_count'] = ruby_sum(process_counts)
+          
+          capacities = filtered_supergroups.map { |sg| sg['capacity_used'] || 0 }
+          filtered_instance['capacity_used'] = ruby_sum(capacities)
+          
+          wait_sizes = filtered_supergroups.map { |sg| sg['get_wait_list_size'] || 0 }
+          filtered_instance['get_wait_list_size'] = ruby_sum(wait_sizes)
+        else
+          # No matching supergroups, skip this instance
+          next
+        end
+      end
+      
+      # Apply PID filter
+      if filter_params[:pid]
+        filtered_supergroups = []
+        (filtered_instance['supergroups'] || []).each do |sg|
+          sg_copy = sg.dup
+          group_copy = (sg['group'] || {}).dup
+          
+          filtered_processes = ((sg['group'] || {})['processes'] || []).select do |proc|
+            proc['pid'].to_s == filter_params[:pid].to_s
+          end
+          
+          if filtered_processes.any?
+            group_copy['processes'] = filtered_processes
+            sg_copy['group'] = group_copy
+            
+            # Recalculate supergroup metrics for filtered processes
+            sg_copy['capacity_used'] = filtered_processes.length
+            sg_copy['get_wait_list_size'] = 0 # Individual process doesn't have queue
+            
+            filtered_supergroups << sg_copy
+          end
+        end
+        
+        if filtered_supergroups.any?
+          filtered_instance['supergroups'] = filtered_supergroups
+          process_counts = filtered_supergroups.map { |sg| 
+            (sg['group']['processes'] || []).length 
+          }
+          filtered_instance['process_count'] = ruby_sum(process_counts)
+          filtered_instance['capacity_used'] = filtered_instance['process_count']
+          filtered_instance['get_wait_list_size'] = 0
+        else
+          # No matching processes, skip this instance
+          next
+        end
+      end
+      
+      filtered_instances << filtered_instance
+    end
+    
+    filtered_instances
+  end
+  
+  # Parse and validate query parameters for filtering
+  def parse_filter_parameters(params)
+    filter_params = {}
+    param_count = 0
+    
+    if params['instance'] && !params['instance'].empty?
+      filter_params[:instance] = params['instance']
+      param_count += 1
+    end
+    
+    if params['supergroup'] && !params['supergroup'].empty?
+      filter_params[:supergroup] = params['supergroup']
+      param_count += 1
+    end
+    
+    if params['pid'] && !params['pid'].empty?
+      filter_params[:pid] = params['pid']
+      param_count += 1
+    end
+    
+    # Only allow one filter parameter at a time
+    if param_count > 1
+      raise "Only one filter parameter allowed at a time. Provided: #{filter_params.keys.join(', ')}"
+    end
+    
+    filter_params
   end
 
   private
@@ -438,6 +558,7 @@ class PrometheusExporterApp < Sinatra::Base
       'supergroups' => supergroups
     }]
   end
+
 
   def generate_passenger_node_prometheus_metrics(passenger_data)
     # Convert passenger-status JSON to same format as passenger-status-node_prometheus
