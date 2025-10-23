@@ -446,8 +446,18 @@ class PrometheusExporterApp < Sinatra::Base
           'pid' => proc.xpath('pid').text,
           'cpu' => proc.xpath('cpu').text.to_f,
           'rss' => proc.xpath('real_memory').text.to_i,
+          'vmsize' => proc.xpath('vmsize').text.to_i,
           'sessions' => proc.xpath('sessions').text.to_i,
-          'processed' => proc.xpath('processed').text.to_i
+          'processed' => proc.xpath('processed').text.to_i,
+          'busyness' => proc.xpath('busyness').text.to_i,
+          'concurrency' => proc.xpath('concurrency').text.to_i,
+          'life_status' => proc.xpath('life_status').text,
+          'enabled' => proc.xpath('enabled').text == 'true',
+          'uptime' => proc.xpath('uptime').text.to_i,
+          'spawn_start_time' => proc.xpath('spawn_start_time').text.to_i,
+          'last_used' => proc.xpath('last_used').text.to_i,
+          'requests' => proc.xpath('requests').text.to_i,
+          'has_metrics' => proc.xpath('has_metrics').text == 'true'
         }
         sg_data['group']['processes'] << process_data
       end
@@ -551,22 +561,80 @@ class PrometheusExporterApp < Sinatra::Base
         group = supergroup['group'] || {}
         (group['processes'] || []).each do |process|
           pid = process['pid'] || 'unknown'
+          labels = "instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\""
           
+          # CPU usage
           metrics << "# HELP passenger_process_cpu CPU usage by process"
           metrics << "# TYPE passenger_process_cpu gauge"
-          metrics << "passenger_process_cpu{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['cpu'] || 0}"
+          metrics << "passenger_process_cpu{#{labels}} #{process['cpu'] || 0}"
           
+          # Memory usage (RSS)
           metrics << "# HELP passenger_process_memory Memory usage by process (rss)"
           metrics << "# TYPE passenger_process_memory gauge"
-          metrics << "passenger_process_memory{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['rss'] || process['real_memory'] || 0}"
+          metrics << "passenger_process_memory{#{labels}} #{process['rss'] || process['real_memory'] || 0}"
           
+          # Memory usage (Virtual Memory Size)
+          metrics << "# HELP passenger_process_vmsize Virtual memory size by process"
+          metrics << "# TYPE passenger_process_vmsize gauge"
+          metrics << "passenger_process_vmsize{#{labels}} #{process['vmsize'] || 0}"
+          
+          # Active sessions
           metrics << "# HELP passenger_process_sessions Active sessions by process"
           metrics << "# TYPE passenger_process_sessions gauge"
-          metrics << "passenger_process_sessions{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['sessions'] || process['session'] || 0}"
+          metrics << "passenger_process_sessions{#{labels}} #{process['sessions'] || process['session'] || 0}"
           
+          # Total requests processed
           metrics << "# HELP passenger_process_processed Total requests processed by process"
           metrics << "# TYPE passenger_process_processed counter"
-          metrics << "passenger_process_processed{instance=\"#{instance_name}\",supergroup=\"#{supergroup_name}\",pid=\"#{pid}\"} #{process['processed'] || process['requests_processed'] || 0}"
+          metrics << "passenger_process_processed{#{labels}} #{process['processed'] || process['requests_processed'] || 0}"
+          
+          # Process busyness (0 = idle, >0 = busy)
+          metrics << "# HELP passenger_process_busyness Process busyness level (0=idle)"
+          metrics << "# TYPE passenger_process_busyness gauge"
+          metrics << "passenger_process_busyness{#{labels}} #{process['busyness'] || 0}"
+          
+          # Concurrency level
+          metrics << "# HELP passenger_process_concurrency Number of concurrent requests being processed"
+          metrics << "# TYPE passenger_process_concurrency gauge"
+          metrics << "passenger_process_concurrency{#{labels}} #{process['concurrency'] || 0}"
+          
+          # Process life status (1 = alive, 0 = dead)
+          life_status_value = (process['life_status'] == 'ALIVE' || process['life_status'] == 'alive') ? 1 : 0
+          metrics << "# HELP passenger_process_alive Process life status (1=alive, 0=dead)"
+          metrics << "# TYPE passenger_process_alive gauge"
+          metrics << "passenger_process_alive{#{labels}} #{life_status_value}"
+          
+          # Process enabled status (1 = enabled, 0 = disabled)
+          enabled_value = (process['enabled'] == true || process['enabled'] == 'true') ? 1 : 0
+          metrics << "# HELP passenger_process_enabled Process enabled status (1=enabled, 0=disabled)"
+          metrics << "# TYPE passenger_process_enabled gauge"
+          metrics << "passenger_process_enabled{#{labels}} #{enabled_value}"
+          
+          # Process uptime in seconds
+          metrics << "# HELP passenger_process_uptime_seconds Process uptime in seconds"
+          metrics << "# TYPE passenger_process_uptime_seconds gauge"
+          metrics << "passenger_process_uptime_seconds{#{labels}} #{process['uptime'] || 0}"
+          
+          # Spawn start time (Unix timestamp)
+          metrics << "# HELP passenger_process_spawn_start_time_seconds Process spawn start time (Unix timestamp)"
+          metrics << "# TYPE passenger_process_spawn_start_time_seconds gauge"
+          metrics << "passenger_process_spawn_start_time_seconds{#{labels}} #{process['spawn_start_time'] || 0}"
+          
+          # Last used time (Unix timestamp) 
+          metrics << "# HELP passenger_process_last_used_seconds Time when process was last used (Unix timestamp)"
+          metrics << "# TYPE passenger_process_last_used_seconds gauge"
+          metrics << "passenger_process_last_used_seconds{#{labels}} #{process['last_used'] || 0}"
+          
+          # Current requests count
+          metrics << "# HELP passenger_process_requests Current number of requests"
+          metrics << "# TYPE passenger_process_requests gauge"
+          metrics << "passenger_process_requests{#{labels}} #{process['requests'] || 0}"
+          
+          # Has metrics flag (1 = has metrics, 0 = no metrics)
+          has_metrics_value = (process['has_metrics'] == true || process['has_metrics'] == 'true') ? 1 : 0
+          metrics << "# HELP passenger_process_has_metrics Whether process has metrics available (1=yes, 0=no)"
+          metrics << "# TYPE passenger_process_has_metrics gauge"
+          metrics << "passenger_process_has_metrics{#{labels}} #{has_metrics_value}"
         end
       end
     end

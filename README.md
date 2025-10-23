@@ -13,19 +13,34 @@ passenger_capacity          | Number of processes spawn
 passenger_processes_active  | Number of processes currently working on requests
 passenger_wait_list_size    | Requests in queue
 
-### Extended Passenger Metrics (via `/monitus/passenger-status-native_prometheus`)
+### Extended Passenger Metrics (via `/monitus/passenger-status-native_prometheus` and `/monitus/passenger-status-prometheus`)
 
-Name                             | Description 
----------------------------------|--------------------------------------------------
-passenger_process_count          | Total number of processes in instance
-passenger_capacity_used          | Capacity used by instance  
-passenger_get_wait_list_size     | Size of get wait list in instance
-passenger_supergroup_capacity_used | Capacity used by supergroup
-passenger_supergroup_get_wait_list_size | Size of get wait list in supergroup
-passenger_process_cpu            | CPU usage by individual process
-passenger_process_memory         | Memory usage by individual process (RSS)
-passenger_process_sessions       | Active sessions by individual process
-passenger_process_processed      | Total requests processed by individual process
+#### Instance and Supergroup Level
+Name                             | Type    | Description 
+---------------------------------|---------|--------------------------------------------------
+passenger_process_count          | gauge   | Total number of processes in instance
+passenger_capacity_used          | gauge   | Capacity used by instance  
+passenger_get_wait_list_size     | gauge   | Size of get wait list in instance
+passenger_supergroup_capacity_used | gauge | Capacity used by supergroup
+passenger_supergroup_get_wait_list_size | gauge | Size of get wait list in supergroup
+
+#### Process Level Metrics
+Name                             | Type    | Description 
+---------------------------------|---------|--------------------------------------------------
+passenger_process_cpu            | gauge   | CPU usage by individual process
+passenger_process_memory         | gauge   | Memory usage by individual process (RSS)
+passenger_process_vmsize         | gauge   | Virtual memory size by individual process
+passenger_process_sessions       | gauge   | Active sessions by individual process
+passenger_process_processed      | counter | Total requests processed by individual process
+passenger_process_busyness       | gauge   | Process busyness level (0=idle, >0=busy)
+passenger_process_concurrency    | gauge   | Number of concurrent requests being processed
+passenger_process_alive          | gauge   | Process life status (1=alive, 0=dead)
+passenger_process_enabled        | gauge   | Process enabled status (1=enabled, 0=disabled)
+passenger_process_uptime_seconds | gauge   | Process uptime in seconds
+passenger_process_spawn_start_time_seconds | gauge | Process spawn start time (Unix timestamp)
+passenger_process_last_used_seconds | gauge | Time when process was last used (Unix timestamp)
+passenger_process_requests       | gauge   | Current number of requests
+passenger_process_has_metrics    | gauge   | Whether process has metrics available (1=yes, 0=no)
 
 Example of output:
 ```
@@ -103,7 +118,10 @@ curl http://localhost:10254/monitus/passenger-status-prometheus?supergroup=/app
 curl http://localhost:10254/monitus/passenger-status-prometheus?pid=12345
 ```
 
-**Note:** Multiple filter parameters in a single request will result in an error.
+**Notes:**
+- Multiple filter parameters in a single request will result in an error
+- All new extended metrics are available with filtering enabled
+- Filtering preserves metric accuracy by recalculating totals after filtering
 
 Note: If you want to have this application's metrics hidden from the metric endpoint, you have to name
 its group `Prometheus exporter`.

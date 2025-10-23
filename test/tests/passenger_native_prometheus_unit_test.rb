@@ -25,8 +25,18 @@ describe "passenger native prometheus unit tests" do
       "passenger_supergroup_get_wait_list_size",
       "passenger_process_cpu",
       "passenger_process_memory",
+      "passenger_process_vmsize",
       "passenger_process_sessions",
-      "passenger_process_processed"
+      "passenger_process_processed",
+      "passenger_process_busyness",
+      "passenger_process_concurrency",
+      "passenger_process_alive",
+      "passenger_process_enabled",
+      "passenger_process_uptime_seconds",
+      "passenger_process_spawn_start_time_seconds",
+      "passenger_process_last_used_seconds",
+      "passenger_process_requests",
+      "passenger_process_has_metrics"
     ]
     
     # Prometheus metric names should match this pattern
@@ -113,9 +123,22 @@ describe "passenger native prometheus unit tests" do
     gauge_metrics = [
       "passenger_process_count",
       "passenger_capacity_used", 
+      "passenger_get_wait_list_size",
+      "passenger_supergroup_capacity_used",
+      "passenger_supergroup_get_wait_list_size",
       "passenger_process_cpu",
       "passenger_process_memory",
-      "passenger_process_sessions"
+      "passenger_process_vmsize",
+      "passenger_process_sessions",
+      "passenger_process_busyness",
+      "passenger_process_concurrency",
+      "passenger_process_alive",
+      "passenger_process_enabled",
+      "passenger_process_uptime_seconds",
+      "passenger_process_spawn_start_time_seconds",
+      "passenger_process_last_used_seconds",
+      "passenger_process_requests",
+      "passenger_process_has_metrics"
     ]
     
     counter_metrics = [

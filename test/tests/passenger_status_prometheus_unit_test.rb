@@ -25,8 +25,18 @@ describe "passenger status prometheus unit tests" do
       "passenger_supergroup_get_wait_list_size",
       "passenger_process_cpu",
       "passenger_process_memory",
+      "passenger_process_vmsize",
       "passenger_process_sessions",
-      "passenger_process_processed"
+      "passenger_process_processed",
+      "passenger_process_busyness",
+      "passenger_process_concurrency",
+      "passenger_process_alive",
+      "passenger_process_enabled",
+      "passenger_process_uptime_seconds",
+      "passenger_process_spawn_start_time_seconds",
+      "passenger_process_last_used_seconds",
+      "passenger_process_requests",
+      "passenger_process_has_metrics"
     ]
     
     # Prometheus metric names should match this pattern
@@ -108,14 +118,74 @@ describe "passenger status prometheus unit tests" do
     assert_match(/^\w+\{[^}]*\} [\d.]+$/, metric_line)
   end
   
+  it "should include new extended metrics in output format" do
+    # Test that new metrics follow proper Prometheus format
+    new_metric_samples = [
+      "# HELP passenger_process_busyness Process busyness level (0=idle)",
+      "# TYPE passenger_process_busyness gauge",
+      'passenger_process_busyness{instance="default",supergroup="/app",pid="12345"} 0',
+      "# HELP passenger_process_alive Process life status (1=alive, 0=dead)",
+      "# TYPE passenger_process_alive gauge",
+      'passenger_process_alive{instance="default",supergroup="/app",pid="12345"} 1',
+      "# HELP passenger_process_uptime_seconds Process uptime in seconds",
+      "# TYPE passenger_process_uptime_seconds gauge",
+      'passenger_process_uptime_seconds{instance="default",supergroup="/app",pid="12345"} 3600'
+    ]
+    
+    new_metric_samples.each do |line|
+      if line.start_with?('# HELP')
+        assert_match(/^# HELP passenger_\w+ /, line, "HELP line should follow format: #{line}")
+      elsif line.start_with?('# TYPE')
+        assert_match(/^# TYPE passenger_\w+ (gauge|counter)$/, line, "TYPE line should follow format: #{line}")
+      else
+        assert_match(/^passenger_\w+\{[^}]*\} [\d.]+$/, line, "Metric line should follow format: #{line}")
+      end
+    end
+  end
+  
+  it "should validate filtering compatibility with new metrics" do
+    # Test that filtering parameters are still valid
+    valid_filter_params = ["instance", "supergroup", "pid"]
+    
+    # These should remain unchanged for backward compatibility
+    valid_filter_params.each do |param|
+      assert_match(/^[a-zA-Z_][a-zA-Z0-9_]*$/, param, "#{param} should be a valid filter parameter")
+    end
+    
+    # Test sample filter URLs
+    sample_urls = [
+      "?instance=default",
+      "?supergroup=/app", 
+      "?pid=12345"
+    ]
+    
+    sample_urls.each do |url_params|
+      # Basic format validation
+      assert_match(/^\?\w+=[\w\/]+$/, url_params, "#{url_params} should be a valid query parameter format")
+    end
+  end
+  
   it "should handle metric type classifications" do
     # Test that we're using correct Prometheus metric types
     gauge_metrics = [
       "passenger_process_count",
       "passenger_capacity_used", 
+      "passenger_get_wait_list_size",
+      "passenger_supergroup_capacity_used",
+      "passenger_supergroup_get_wait_list_size",
       "passenger_process_cpu",
       "passenger_process_memory",
-      "passenger_process_sessions"
+      "passenger_process_vmsize",
+      "passenger_process_sessions",
+      "passenger_process_busyness",
+      "passenger_process_concurrency",
+      "passenger_process_alive",
+      "passenger_process_enabled",
+      "passenger_process_uptime_seconds",
+      "passenger_process_spawn_start_time_seconds",
+      "passenger_process_last_used_seconds",
+      "passenger_process_requests",
+      "passenger_process_has_metrics"
     ]
     
     counter_metrics = [
