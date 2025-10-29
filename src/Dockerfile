@@ -33,4 +33,4 @@ STOPSIGNAL SIGTERM
 # Healthcheck для Docker/Kubernetes
 HEALTHCHECK --interval=10s --timeout=2s --retries=3 CMD curl -f http://localhost:${PORT}/health || exit 1
 
-CMD ["bundle", "exec", "ruby", "server.rb", "-o", "0.0.0.0", "-p", "8080"]
+CMD ["bundle", "exec", "ruby", "victima.rb", "-o", "0.0.0.0", "-p", "8080"]
