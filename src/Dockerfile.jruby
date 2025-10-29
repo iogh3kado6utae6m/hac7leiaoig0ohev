@@ -82,10 +82,5 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=30s \
 
 # Use Puma server (better for JRuby than Thin)
 # Puma config optimized for JRuby
-CMD ["bundle", "exec", "puma", \
-     "-C", "config/puma.rb", \
-     "-b", "tcp://0.0.0.0:8080", \
-     "-e", "production", \
-     "-t", "8:32", \
-     "--preload", \
-     "config.ru.jruby"]
+# Use startup script to handle bundler issues intelligently
+CMD ["./start-jruby.sh"]
