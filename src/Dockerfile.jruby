@@ -1,5 +1,5 @@
 # --- Stage 1: Builder image ---
-FROM jruby:9.4-jdk11 AS builder
+FROM jruby:9.4-jdk17 AS builder
 
 # Set JRuby-specific environment variables
 ENV JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
@@ -28,7 +28,7 @@ RUN gem install bundler:2.4.22 && \
 COPY . .
 
 # --- Stage 2: Runtime image ---
-FROM jruby:9.4-jdk11-slim
+FROM jruby:9.4-jdk17-slim
 
 # Runtime environment variables
 ENV RACK_ENV=production \

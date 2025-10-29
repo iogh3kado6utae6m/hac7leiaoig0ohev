@@ -21,9 +21,9 @@ Monitus теперь поддерживает запуск на JRuby в Docker 
 ├──────────────┤
 │ Sinatra App │
 ├──────────────┤
-│ JRuby 9.3+  │
+│ JRuby 9.4+  │
 ├──────────────┤
-│  JVM 11+    │
+│  JVM 17+    │
 ├──────────────┤
 │  Puma       │
 ├──────────────┤
@@ -251,9 +251,11 @@ gem install jruby-openssl
 # https://github.com/ruby/setup-ruby#supported-versions
 
 # Обновить в .github/workflows/*.yml:
-# ruby-version: jruby-9.3.10.0  # вместо 9.4.x
+# ruby-version: jruby  # использует последнюю стабильную
+# ruby-version: jruby-9.4.14.0  # или конкретную версию
+# runs-on: ubuntu-22.04  # вместо ubuntu-latest для лучшей совместимости
 
-# Или добавить fallback механизм в CI
+# Многоуровневый fallback механизм в CI
 ```
 
 ### Логи и диагностика

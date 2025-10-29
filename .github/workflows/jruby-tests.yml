@@ -18,28 +18,37 @@ on:
 
 jobs:
   jruby-compatibility:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        jruby-version: ['9.3.10.0']
+        jruby-version: ['9.4.14.0']
       fail-fast: false
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up JRuby
-        id: setup-jruby
+      - name: Set up JRuby (specific version)
+        id: setup-jruby-specific
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: jruby-${{ matrix.jruby-version }}
           bundler-cache: false
         continue-on-error: true
         
-      - name: Set up JRuby fallback
-        if: steps.setup-jruby.outcome == 'failure'
+      - name: Set up JRuby (latest stable)
+        if: steps.setup-jruby-specific.outcome == 'failure'
+        id: setup-jruby-latest
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: jruby-9.3.10.0
+          ruby-version: jruby
+          bundler-cache: false
+        continue-on-error: true
+        
+      - name: Set up JRuby fallback (old stable)
+        if: steps.setup-jruby-specific.outcome == 'failure' && steps.setup-jruby-latest.outcome == 'failure'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: jruby-9.2.21.0
           bundler-cache: false
           
       - name: Install system dependencies
@@ -242,7 +251,7 @@ jobs:
           echo "Java Version: $(java -version 2>&1 | head -n 1)"
 
   jruby-docker-integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     # Run weekly and on manual trigger to avoid overloading CI
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule')
     
