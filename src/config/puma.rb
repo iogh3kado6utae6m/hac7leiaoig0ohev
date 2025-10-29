@@ -2,7 +2,6 @@
 # JRuby benefits from threading more than forking
 
 # Use environment variables or defaults
-port ENV.fetch('PORT', 8080)
 environment ENV.fetch('RACK_ENV', 'production')
 
 # JRuby-optimized thread configuration
@@ -71,11 +70,4 @@ if defined?(JRUBY_VERSION)
   puts "Java version: #{java.lang.System.getProperty('java.version')}" if defined?(java)
 end
 
-# Health check endpoint
-app do |env|
-  if env['PATH_INFO'] == '/health'
-    [200, {'Content-Type' => 'text/plain'}, ['OK']]
-  else
-    [404, {'Content-Type' => 'text/plain'}, ['Not Found']]
-  end
-end
+# Health check endpoint will be handled by the config.ru application
