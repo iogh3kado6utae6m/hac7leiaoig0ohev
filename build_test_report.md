@@ -93,4 +93,23 @@ The deployment setting requires a lockfile. Please make sure you have checked yo
 - Used `bundle config set --local path 'vendor/bundle'` instead
 - Added script `generate-jruby-lockfile.sh` for future lockfile generation if needed
 
-**Status:** ✅ **Fully Resolved** - All JRuby Docker builds should now work correctly.
+### Runtime Bundler Issue (Follow-up #2)
+
+**Issue:** After fixing bundler deployment mode, Docker run failed with:
+```
+bundler: command not found: puma
+Install missing gem executables with `bundle install`
+```
+
+**Cause:** Multi-stage build didn't install bundler in runtime stage and didn't configure bundle path properly.
+
+**Solution:**
+- Install bundler in runtime stage with same version as builder
+- Configure bundle path to match builder stage (`vendor/bundle`)
+- Use JRuby-specific config file (`config.ru.jruby`)
+- Add diagnostic commands to verify gem installation
+- Temporarily run as root for simplified troubleshooting
+
+**Validation:** Added `test-docker-jruby.sh` script for pre-build checks.
+
+**Status:** ✅ **Fully Resolved** - JRuby Docker build and run should now work correctly.
