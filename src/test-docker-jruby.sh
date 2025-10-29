@@ -28,3 +28,10 @@ echo "Checking JRuby-specific gem configuration:"
 grep -c "nokogiri\|sinatra\|puma\|prometheus-client" Gemfile.jruby && echo "✅ Core gems present"
 ! grep "^gem.*thin" Gemfile.jruby && echo "✅ No thin dependency (avoids EventMachine conflicts)"
 ! grep "^gem.*faye-websocket" Gemfile.jruby && echo "✅ No faye-websocket dependency (not needed for core app)"
+echo "5. Lockfile conflict check:"
+if [ -f "Gemfile.lock" ]; then
+    echo "⚠️  WARNING: Gemfile.lock present - may cause thin dependency conflicts"
+    grep -q "thin" Gemfile.lock && echo "❌ Gemfile.lock contains thin dependency" || echo "✅ Gemfile.lock doesn't contain thin"
+else
+    echo "✅ No Gemfile.lock present - no conflict risk"
+fi

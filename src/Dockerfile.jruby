@@ -16,18 +16,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy JRuby-specific Gemfile
+# Copy JRuby-specific Gemfile and ensure no MRI lockfile interferes
 COPY Gemfile.jruby Gemfile
+# Note: Explicitly avoid copying Gemfile.lock (MRI-specific) to prevent dependency conflicts
 
 # Install bundler and gems
-# Use path vendor/bundle for consistent gem installation
+# Use path vendor/bundle for consistent gem installation  
 RUN gem install bundler:2.4.22 && \
     bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
+    echo "Generating fresh JRuby lockfile..." && \
     bundle install --jobs=4 --retry=3
 
 # Copy application code
 COPY . .
+
+# Remove MRI-specific lockfile that conflicts with JRuby dependencies
+RUN rm -f Gemfile.lock && echo "Removed conflicting MRI Gemfile.lock"
 
 # --- Stage 2: Runtime image ---
 # Use jruby:9.4 as the base runtime image
@@ -58,6 +63,7 @@ COPY --from=builder /app /app
 # Configure bundler to use the same path as in builder stage
 RUN bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
+    rm -f Gemfile.lock && echo "Ensured no conflicting lockfile in runtime" && \
     ls -la vendor/bundle/ || echo "Warning: vendor/bundle directory not found" && \
     bundle list | head -10 || echo "Warning: bundle list failed"
 

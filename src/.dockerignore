@@ -1,0 +1,12 @@
+# Ignore MRI-specific lockfile to prevent JRuby dependency conflicts
+Gemfile.lock
+
+# Ignore other potentially conflicting files
+Gemfile
+Gemfile.legacy
+.bundle/
+vendor/bundle/
+
+# Ignore test and development files  
+test-docker-jruby.sh
+*.md
