@@ -15,14 +15,23 @@ docker build -f src/Dockerfile.jruby -t monitus-jruby src/
 
 ## Troubleshooting
 
-### "Could not find gem 'thin'" Error
+### Gem Dependency Errors
 
+#### "Could not find gem 'thin'" Error
 **Cause:** MRI `Gemfile.lock` interfering with JRuby gem resolution.
 
 **Solutions:**
 1. Dockerfile automatically removes `Gemfile.lock` 
 2. `.dockerignore` excludes MRI-specific files
 3. Force clean build: `docker build --no-cache ...`
+
+#### "Could not find gem 'minitest'" Error
+**Cause:** Test dependencies included but excluded with `--without development test`.
+
+**Solutions:**
+1. Removed minitest/rack-test from production Gemfile.jruby
+2. More aggressive bundler state cleanup (`.bundle/` directory)
+3. Production build only includes essential gems (12 total)
 
 ### Validation
 

@@ -35,3 +35,8 @@ if [ -f "Gemfile.lock" ]; then
 else
     echo "✅ No Gemfile.lock present - no conflict risk"
 fi
+echo "6. Production gem validation:"
+echo "Checking no test dependencies in JRuby Gemfile:"
+! grep "^gem.*minitest" Gemfile.jruby && echo "✅ No minitest dependency (not needed in production)"
+! grep "^gem.*rack-test" Gemfile.jruby && echo "✅ No rack-test dependency (not needed in production)"
+echo "Core production gems: $(grep -c '^gem' Gemfile.jruby) gems total"
