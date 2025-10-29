@@ -1,78 +1,32 @@
 source 'https://rubygems.org'
 
-# JRuby-specific gem configuration
-# JRuby version detection and compatibility
-jruby_version = JRUBY_VERSION if defined?(JRUBY_VERSION)
-ruby_version = RUBY_VERSION
+# JRuby-optimized gem configuration
+# Core web framework dependencies
+gem 'nokogiri'           # JRuby uses Java XML processing
+gem 'sinatra', '~> 3.0'  # Latest Sinatra with JRuby support  
+gem 'rack', '~> 2.2'     # Stable rack version
+gem 'puma'               # Excellent JRuby threading support
+gem 'rackup'             # Required for modern Rack
 
-# Core dependencies with JRuby compatibility
-gem 'nokogiri' # JRuby can use Java version
-gem 'sinatra', '~> 3.0' # Latest Sinatra works well with JRuby
-gem 'rack', '~> 2.2' # Stable rack version for JRuby
-gem 'puma' # Puma has excellent JRuby support
-gem 'rackup'
+# WebSocket and metrics
+gem 'faye-websocket'     # WebSocket support for JRuby
+gem 'prometheus-client'  # Prometheus metrics
 
-# JRuby prefers Puma over Thin (Thin uses EventMachine which has issues on JRuby)
-# gem 'thin' # Skip thin for JRuby - use Puma instead
-
-# WebSocket support - faye-websocket works on JRuby
-gem 'faye-websocket'
-
-# Metrics and monitoring
-gem 'prometheus-client' # Works well on JRuby
-
-# Concurrency libraries
-gem 'concurrent-ruby' # Excellent JRuby support, uses Java threading
-
-# Standard library dependencies
+# Concurrency and utilities
+gem 'concurrent-ruby'    # Leverages JVM threading
 gem 'logger'
 gem 'ipaddr'
-gem 'json' # Often needed explicitly on JRuby
+gem 'json'
 
-# Optional GeoIP support
-# Note: maxminddb might have C extensions that don't work on JRuby
-# Use conditional loading
-begin
-  gem 'maxminddb'
-rescue Gem::InstallError
-  # Skip if C extensions can't compile on JRuby
-  puts "Warning: Skipping maxminddb on JRuby due to C extension compatibility"
-end
+# Optional dependencies
+gem 'maxminddb'          # GeoIP support (works on JRuby)
 
-# System metrics - alternative JRuby-compatible gems
-# sys-cpu and sys-filesystem may have issues on JRuby, use alternatives
-if defined?(JRUBY_VERSION)
-  # JRuby-specific system monitoring
-  gem 'jruby-jmx' # Java Management Extensions for system metrics
-  gem 'java' # Access to Java classes for system information
-else
-  # Fallback for non-JRuby environments
-  gem 'sys-cpu'
-  gem 'sys-filesystem'
-end
-
-# JRuby-specific optimizations
-if defined?(JRUBY_VERSION)
-  # JDBC drivers if database connectivity is needed
-  # gem 'jdbc-sqlite3' # Example JDBC driver
-  
-  # JRuby OpenSSL for better SSL performance
-  gem 'jruby-openssl'
-  
-  # Better JSON performance on JRuby
-  gem 'jrjackson' # Fast JSON library for JRuby
-end
+# JRuby-specific optimizations (only install on JRuby platform)
+gem 'jruby-openssl', platforms: :jruby   # Enhanced SSL performance
+gem 'jrjackson', platforms: :jruby       # Fast JSON parsing
 
 # Development and testing dependencies
 group :development, :test do
   gem 'minitest'
   gem 'rack-test'
-end
-
-# Production optimizations for JRuby
-group :production do
-  # JRuby-specific production gems
-  if defined?(JRUBY_VERSION)
-    gem 'warbler' # For creating WAR files if deploying to Java containers
-  end
 end

@@ -8,7 +8,7 @@ Monitus теперь поддерживает запуск на JRuby в Docker 
 
 - **True Threading**: JRuby имеет настоящую многопоточность без Global Interpreter Lock (GIL)
 - **JVM Performance**: Использует оптимизации JVM и JIT-компиляцию
-- **Java Integration**: Прямой доступ к Java библиотекам и JMX метрикам
+- **Java Integration**: Прямой доступ к Java библиотекам и JVM метрикам
 - **Memory Management**: Продвинутое управление памятью через JVM garbage collector
 - **Scalability**: Лучшая масштабируемость для высоконагруженных систем
 
@@ -117,7 +117,7 @@ end
 Основные отличия:
 - Использует `jrjackson` вместо стандартного JSON
 - Добавляет `jruby-openssl` для лучшего SSL
-- Включает `jruby-jmx` для системных метрик
+- Использует Java APIs для системных метрик
 - Пропускает `thin` (использует Puma)
 
 ## Docker образы
@@ -178,39 +178,41 @@ FROM jruby:9.4-jdk17-slim
 
 ## Мониторинг JRuby
 
-### JMX метрики
+### JVM метрики
 
-JRuby предоставляет дополнительные JVM метрики через JMX:
+JRuby предоставляет дополнительные JVM метрики через Java APIs:
 
 ```ruby
 if defined?(JRUBY_VERSION)
-  require 'jruby/jmx'
+  require 'java'
   
   # Память JVM
-  memory_bean = JRuby::JMX::MemoryMXBean.new
-  heap_usage = memory_bean.heap_memory_usage
+  runtime = Java::JavaLang::Runtime.getRuntime
+  total_memory = runtime.totalMemory
+  free_memory = runtime.freeMemory
+  used_memory = total_memory - free_memory
   
-  # GC статистика
-  gc_beans = JRuby::JMX::GarbageCollectorMXBean.instances
+  # Информация о JVM
+  java_version = Java::JavaLang::System.getProperty('java.version')
+  jruby_version = JRUBY_VERSION
 end
 ```
 
 ### Prometheus метрики
 
-Дополнительные метрики для JRuby:
+Дополнительные метрики для JRuby (можно добавить в prometheus_exporter.rb):
 
 ```
 # JVM память
-jruby_heap_memory_used_bytes
-jruby_heap_memory_max_bytes
+jruby_heap_memory_used_bytes{instance="default"}
+jruby_heap_memory_total_bytes{instance="default"}
+jruby_heap_memory_max_bytes{instance="default"}
 
-# GC статистика
-jruby_gc_collections_total
-jruby_gc_time_seconds_total
+# JVM информация  
+jruby_runtime_info{java_version="11.0.28",jruby_version="9.4.14.0"}
 
-# Потоки
-jruby_threads_current
-jruby_threads_daemon
+# Потоки (available via standard Thread.list)
+jruby_threads_active_count
 ```
 
 ## Troubleshooting
