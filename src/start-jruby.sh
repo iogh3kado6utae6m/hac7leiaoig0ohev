@@ -35,8 +35,8 @@ else
     else
         echo "Bundle exec failed, trying simple config..."
         
-        # Method 3: Direct puma with simple config (fallback)
-        echo "Method 3: Trying direct puma with simple config..."
-        puma -C config/puma.rb simple-config.ru
+        # Method 3: Direct puma via bundle with simple config (fallback)
+        echo "Method 3: Trying bundle exec puma with simple config..."
+        bundle exec puma -C config/puma.rb simple-config.ru
     fi
 fi

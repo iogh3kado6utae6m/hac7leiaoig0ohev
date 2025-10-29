@@ -12,18 +12,20 @@ if defined?(JRUBY_VERSION)
   threads_count = ENV.fetch('RAILS_MAX_THREADS', 16).to_i
   threads threads_count, threads_count * 2
   
-  # JRuby doesn't benefit as much from workers (forking)
-  # Use fewer workers and rely more on threading
-  workers ENV.fetch('WEB_CONCURRENCY', 1).to_i
+  # JRuby doesn't support worker mode (forking) reliably
+  # Run in single-process mode with high thread count instead
+  # Note: Don't set workers() for JRuby - it defaults to 0 (single process)
   
-  # Preload application for better memory usage
-  preload_app!
+  puts "JRuby detected: Running in single-process mode with #{threads_count}-#{threads_count * 2} threads"
 else
   # Standard configuration for MRI Ruby
   threads_count = ENV.fetch('RAILS_MAX_THREADS', 5).to_i
   threads threads_count, threads_count
   
   workers ENV.fetch('WEB_CONCURRENCY', 2).to_i
+  
+  # Preload application for better memory usage with workers
+  preload_app!
 end
 
 # Bind to all interfaces
@@ -37,20 +39,26 @@ else
   activate_control_app 'tcp://127.0.0.1:9293', { no_token: true }
 end
 
-# Worker and thread management (updated for Puma v7+)
-before_worker_boot do
-  # Code to run before forking workers
-  puts "Preparing to fork workers"
-end
-
-on_worker_boot do
-  # Code to run when a worker starts
-  puts "Worker #{Process.pid} started"
-end
-
-# Graceful shutdown configuration
-before_worker_shutdown do
-  puts "Worker #{Process.pid} shutting down"
+# Worker and thread management (for MRI Ruby only)
+unless defined?(JRUBY_VERSION)
+  # Only set worker callbacks for MRI Ruby that supports forking
+  before_worker_boot do
+    # Code to run before forking workers
+    puts "Preparing to fork workers"
+  end
+  
+  on_worker_boot do
+    # Code to run when a worker starts
+    puts "Worker #{Process.pid} started"
+  end
+  
+  # Graceful shutdown configuration
+  before_worker_shutdown do
+    puts "Worker #{Process.pid} shutting down"
+  end
+else
+  # JRuby runs in single-process mode, no worker callbacks needed
+  puts "JRuby single-process mode: No worker callbacks configured"
 end
 
 # JRuby-specific optimizations
