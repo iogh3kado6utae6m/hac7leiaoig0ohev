@@ -50,6 +50,7 @@ ENV RACK_ENV=production \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
