@@ -8,8 +8,7 @@ gem 'rack', '~> 2.2'     # Stable rack version
 gem 'puma'               # Excellent JRuby threading support
 gem 'rackup'             # Required for modern Rack
 
-# WebSocket and metrics
-gem 'faye-websocket'     # WebSocket support for JRuby
+# Metrics (core requirement)
 gem 'prometheus-client'  # Prometheus metrics
 
 # Concurrency and utilities
@@ -18,8 +17,9 @@ gem 'logger'
 gem 'ipaddr'
 gem 'json'
 
-# Optional dependencies
-gem 'maxminddb'          # GeoIP support (works on JRuby)
+# Optional dependencies (core app doesn't require websockets or maxminddb)
+# gem 'faye-websocket'   # Only needed for victima.rb test server
+# gem 'maxminddb'        # Only needed if GeoIP features are used
 
 # JRuby-specific optimizations (only install on JRuby platform)
 gem 'jruby-openssl', platforms: :jruby   # Enhanced SSL performance
