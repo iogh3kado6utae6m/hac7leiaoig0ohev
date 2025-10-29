@@ -25,8 +25,10 @@ gem 'json'
 gem 'jruby-openssl', platforms: :jruby   # Enhanced SSL performance
 gem 'jrjackson', platforms: :jruby       # Fast JSON parsing
 
-# Development and testing dependencies (not needed for production prometheus exporter)
-# group :development, :test do
-#   gem 'minitest'
-#   gem 'rack-test'
-# end
+# Testing dependencies (needed for CI tests)
+gem 'minitest'   # Test framework
+
+# Development and testing dependencies
+group :development, :test do
+  gem 'rack-test'
+end

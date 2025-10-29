@@ -86,8 +86,12 @@ jobs:
           
       - name: Install test dependencies
         run: |
-          cd test
-          jruby -S bundle install --jobs 4 --retry 3
+          cd src
+          # Install test dependencies by updating bundle config
+          bundle config set --local without ""
+          bundle install --jobs 4 --retry 3 --with development test
+          echo "Verifying minitest installation:"
+          jruby -S bundle exec ruby -e "require 'minitest/autorun'; puts 'Minitest available'"
           
       - name: Run JRuby syntax checks
         run: |

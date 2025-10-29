@@ -1,4 +1,26 @@
-require_relative "test_helper"
+# Handle different environments for test helper loading
+begin
+  require_relative "test_helper"
+rescue LoadError
+  # If test_helper not found, provide minimal setup
+  require 'minitest/autorun'
+  require 'net/http'
+  require 'uri'
+  
+  def wait_to_be_ready(uri, max_retries: 5, delay: 3)
+    retries ||= 0
+    return Net::HTTP.get(URI(uri))
+  rescue Errno::ECONNREFUSED
+   sleep delay
+   retry if (retries += 1) < max_retries
+   raise
+  end
+  
+  def assert_valid_test_http_status(status, message = nil)
+    message ||= "Expected valid test HTTP status code (200 or 500), got #{status}"
+    assert [200, 500].include?(status), message
+  end
+end
 require 'java' if defined?(JRUBY_VERSION)
 
 # JRuby-specific compatibility tests
