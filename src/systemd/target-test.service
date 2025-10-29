@@ -1,0 +1,44 @@
+# Copy to  `/etc/systemd/system/target-test.service`
+# Use to `sudo useradd -r -s /usr/sbin/nologin targetsrv`
+
+[Unit]
+Description=Target Network Test Server (Sinatra/Rack)
+After=network.target
+
+[Service]
+Type=simple
+User=targetsrv
+Group=targetsrv
+WorkingDirectory=/opt/target-server
+ExecStart=/usr/bin/env bundle exec ruby server.rb -o 0.0.0.0 -p 8080
+
+# Среда
+Environment="RACK_ENV=production"
+Environment="PORT=8080"
+Environment="LOG_LEVEL=info"
+
+# Ресурсы и поведение
+Restart=always
+RestartSec=5s
+TimeoutStopSec=15
+KillSignal=SIGTERM
+
+# Лимиты
+LimitNOFILE=65535
+MemoryLimit=512M
+CPUQuota=80%
+
+# Логи
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=target-test
+
+# Безопасность
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/opt/target-server/logs
+
+[Install]
+WantedBy=multi-user.target

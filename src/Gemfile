@@ -3,12 +3,23 @@ source 'https://rubygems.org'
 # Conditional dependency loading based on Ruby version
 if RUBY_VERSION >= '3.0.0'
   # Modern Ruby (3.0+) with current gem versions
-  gem 'nokogiri'     # Use latest compatible version
-  gem 'sinatra'      # Use latest compatible version  
-  gem 'rack'         # Use latest compatible version
-  gem 'puma'         # Use latest compatible version
-  gem 'rackup'       # Required for Ruby 3.0+
-  
+  gem 'nokogiri' # Use latest compatible version
+  gem 'sinatra'  # Use latest compatible version
+  gem 'rack'     # Use latest compatible version
+  gem 'puma'     # Use latest compatible version
+  gem 'rackup'   # Required for Ruby 3.0+
+  gem 'thin'     # lightweight server that works with EventMachine
+  gem 'faye-websocket'
+  gem 'prometheus-client' # metrics exporter
+  gem 'concurrent-ruby'   # thread-safe datastructures
+  gem 'logger'
+  gem 'ipaddr'
+  gem 'maxminddb'             # optional: GeoIP (requires GeoLite2 DB)
+  # Optional for richer system metrics (Linux)
+  gem 'sys-cpu'
+  gem 'sys-filesystem'
+
+
   # Ruby 3.1+ requires explicit net-ftp
   gem 'net-ftp' if RUBY_VERSION >= '3.1.0'
   
@@ -19,6 +30,15 @@ elsif RUBY_VERSION >= '2.4.0'
   gem 'rack', '~> 2.1.0'
   gem 'puma', '~> 4.3.0'
   gem 'rackup'
+  gem 'faye-websocket'
+  gem 'prometheus-client'     # metrics exporter
+  gem 'concurrent-ruby'       # thread-safe datastructures
+  gem 'logger'
+  gem 'ipaddr'
+  gem 'maxminddb'             # optional: GeoIP (requires GeoLite2 DB)
+  # Optional for richer system metrics (Linux)
+  gem 'sys-cpu'
+  gem 'sys-filesystem'
   
 else
   # Ruby 2.3.8 - use legacy-compatible versions
@@ -27,5 +47,14 @@ else
   gem 'rack', '~> 2.0.9' 
   gem 'puma', '~> 3.12.6'
   gem 'json', '~> 2.3.1'  # May be needed for older Ruby
+  gem 'faye-websocket'
+  gem 'prometheus-client'     # metrics exporter
+  gem 'concurrent-ruby'       # thread-safe datastructures
+  gem 'logger'
+  gem 'ipaddr'
+  gem 'maxminddb'             # optional: GeoIP (requires GeoLite2 DB)
+  # Optional for richer system metrics (Linux)
+  gem 'sys-cpu'
+  gem 'sys-filesystem'
   # rackup is built into rack for Ruby 2.3.x
 end
