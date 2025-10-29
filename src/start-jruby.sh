@@ -1,5 +1,5 @@
 #!/bin/bash
-# Simple JRuby startup script to bypass bundler issues
+# Simple JRuby startup script to handle different config approaches
 
 echo "Starting JRuby Monitus with Puma..."
 echo "JRuby version: $(jruby --version)"
@@ -24,16 +24,18 @@ echo "Attempting to start Puma..."
 # Method 1: Try bundle exec with JRuby config (normal approach)
 echo "Method 1: Trying bundle exec puma with JRuby config..."
 if bundle exec puma -C config/puma.rb config.ru.jruby; then
-    echo "Bundle exec puma started successfully with JRuby config!"
+    echo "JRuby config started successfully!"
 else
-    echo "JRuby config failed, trying standard config..."
+    EXIT_CODE=$?
+    echo "JRuby config failed with exit code $EXIT_CODE, trying standard config..."
     
     # Method 2: Try standard config.ru
     echo "Method 2: Trying bundle exec with standard config..."
     if bundle exec puma -C config/puma.rb config.ru; then
         echo "Standard config worked!"
     else
-        echo "Bundle exec failed, trying simple config..."
+        EXIT_CODE=$?
+        echo "Standard config failed with exit code $EXIT_CODE, trying simple config..."
         
         # Method 3: Direct puma via bundle with simple config (fallback)
         echo "Method 3: Trying bundle exec puma with simple config..."

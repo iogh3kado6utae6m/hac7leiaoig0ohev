@@ -42,8 +42,8 @@ FROM jruby:9.4
 ENV RACK_ENV=production \
     PORT=8080 \
     LOG_LEVEL=info \
-    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
-    JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true -J-Djnr.ffi.asm.enabled=false" \
+    JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djnr.netdb.provider=files" \
     MALLOC_ARENA_MAX=2
 
 # Install runtime dependencies

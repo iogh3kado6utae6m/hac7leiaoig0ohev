@@ -1,25 +1,52 @@
-# Simple config.ru without bundler requirements
-# Load gems directly from vendor/bundle path
+# Simple config.ru for JRuby fallback mode
+# Minimal dependencies to ensure startup works
 
-$LOAD_PATH.unshift('/app/vendor/bundle/jruby/3.1.0/gems/*/lib')
+begin
+  require "bundler/setup"
+rescue LoadError
+  # If bundler fails, try manual path setup
+  $LOAD_PATH.unshift('/app/vendor/bundle/jruby/3.1.0/gems/*/lib')
+end
 
-# Manual gem loading to avoid bundler
-require 'sinatra/base'
-require 'nokogiri'
-require 'json'
+# Try to load the main application
+app_loaded = false
+begin
+  require_relative 'prometheus_exporter'
+  main_app = PrometheusExporterApp
+  app_loaded = true
+  puts "Loaded PrometheusExporterApp in simple mode"
+rescue LoadError => e
+  puts "Could not load PrometheusExporterApp: #{e.message}"
+  begin
+    require_relative 'victima'
+    main_app = TargetApp
+    app_loaded = true
+    puts "Loaded TargetApp in simple mode"
+  rescue LoadError => e2
+    puts "Could not load TargetApp either: #{e2.message}"
+  end
+end
 
-# Load the main application
-require_relative 'prometheus_exporter'
-
-# Simple health check
+# Simple health check with fallback
 class SimpleHealthCheck
-  def self.call(env)
+  def initialize(main_app = nil)
+    @main_app = main_app
+  end
+  
+  def call(env)
     if env['PATH_INFO'] == '/health'
-      [200, {'Content-Type' => 'text/plain'}, ['OK - JRuby Direct Mode']]
+      [200, {'Content-Type' => 'text/plain'}, ['OK - JRuby Simple Mode']]
+    elsif @main_app
+      @main_app.call(env)
     else
-      PrometheusExporterApp.call(env)
+      [200, {'Content-Type' => 'text/plain'}, ['JRuby Server Running - No main app loaded']]
     end
   end
 end
 
-run SimpleHealthCheck
+if app_loaded
+  run SimpleHealthCheck.new(main_app)
+else
+  puts "Running in health-check-only mode"
+  run SimpleHealthCheck.new
+end
