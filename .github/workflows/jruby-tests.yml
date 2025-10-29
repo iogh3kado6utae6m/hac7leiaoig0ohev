@@ -154,13 +154,14 @@ jobs:
       - name: Run JRuby compatibility tests
         run: |
           echo "🔬 Running JRuby compatibility tests..."
-          cd test
           
           # Set JRuby optimization environment (skip deprecated --server flag)
           export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           export JAVA_OPTS="-Xmx2G -Xms512M -XX:+UseG1GC"
           
-          jruby -S bundle exec ruby tests/jruby_compatibility_test.rb
+          # Run tests from src directory where gems are installed
+          cd src
+          jruby -S bundle exec ruby ../test/tests/jruby_compatibility_test.rb
           
           echo "✅ JRuby compatibility tests completed!"
           

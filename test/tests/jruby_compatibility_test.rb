@@ -37,7 +37,12 @@ describe "JRuby compatibility" do
       expected_results = [0, 2, 4, 6, 8]
       
       assert_equal expected_results, results, "Threading should work correctly"
-      assert Thread.list.length >= thread_count_before + 5, "Threads should be created"
+      
+      # Check that threads were created and executed
+      thread_count_after = Thread.list.length
+      # Note: threads might have finished by now, so we check that threading worked by results
+      assert_equal 5, threads.length, "Should have created 5 threads"
+      assert results.any? { |r| r > 0 }, "Threads should have executed successfully"
     end
     
     it "should have proper memory management" do
@@ -130,15 +135,23 @@ describe "JRuby compatibility" do
   
   describe "Application loading on JRuby" do
     it "should load PrometheusExporterApp successfully" do
-      # Load the main application file
-      require_relative "../../src/prometheus_exporter"
+      # Load the main application file with flexible path
+      begin
+        require_relative "../prometheus_exporter"
+      rescue LoadError
+        require_relative "../../src/prometheus_exporter"
+      end
       
       assert defined?(PrometheusExporterApp), "PrometheusExporterApp should be defined"
       assert PrometheusExporterApp < Sinatra::Base, "Should inherit from Sinatra::Base"
     end
     
     it "should instantiate PrometheusExporterApp" do
-      require_relative "../../src/prometheus_exporter"
+      begin
+        require_relative "../prometheus_exporter"
+      rescue LoadError
+        require_relative "../../src/prometheus_exporter"
+      end
       
       app = PrometheusExporterApp.new
       assert_respond_to app, :call, "App should respond to call method"
@@ -149,7 +162,11 @@ describe "JRuby compatibility" do
     end
     
     it "should handle basic HTTP requests" do
-      require_relative "../../src/prometheus_exporter"
+      begin
+        require_relative "../prometheus_exporter"
+      rescue LoadError
+        require_relative "../../src/prometheus_exporter"
+      end
       require 'rack/test'
       
       include Rack::Test::Methods
