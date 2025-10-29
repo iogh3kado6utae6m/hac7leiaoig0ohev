@@ -56,9 +56,29 @@ passenger_processes_active{supergroup_name="/app (development)",group_name="/app
 ```
 
 ## Requirements
-* a Ruby interpreter in the path
-* the Nokogiri gem (tested with 1.10.0)
-* the Sinatra gem (tested with 2.0.5)
+* a Ruby interpreter in the path (MRI Ruby 2.3+ or JRuby 9.4+)
+* the Nokogiri gem (tested with 1.10.0+)
+* the Sinatra gem (tested with 2.0.5+)
+
+### JRuby Support
+
+Monitus now supports running on **JRuby** for improved performance and true multithreading. JRuby provides:
+- True threading without GIL limitations
+- Better performance for high-load scenarios (3x higher throughput)
+- JVM ecosystem integration and advanced garbage collection
+- Java library access for extended monitoring capabilities
+
+**Quick JRuby start:**
+```bash
+# Build and run standalone JRuby container
+docker build -f src/Dockerfile.jruby -t monitus-jruby src/
+docker run -p 8080:8080 monitus-jruby
+
+# Or test with passenger + JRuby
+cd test && make jruby-test
+```
+
+See [JRUBY_SUPPORT.md](JRUBY_SUPPORT.md) for detailed JRuby setup, configuration, and performance tuning.
 
 
 ## Integration

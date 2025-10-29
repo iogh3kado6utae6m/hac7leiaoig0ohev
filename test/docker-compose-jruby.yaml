@@ -1,0 +1,150 @@
+# Docker Compose configuration with JRuby support
+services:
+  # Original MRI Ruby services
+  passenger_with_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.with-app
+    hostname: 'passenger_with_app'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 45s
+    networks:
+      - test_network
+      
+  passenger_without_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.without-app
+    hostname: 'passenger_without_app'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 45s
+    networks:
+      - test_network
+      
+  passenger_with_visible_prometheus:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.with-visible-prometheus-app
+    hostname: 'passenger_with_visible_prometheus'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 45s
+    networks:
+      - test_network
+
+  # JRuby variants
+  passenger_jruby_with_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.jruby-with-app
+    hostname: 'passenger_jruby_with_app'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s  # Longer startup time for JRuby
+    networks:
+      - test_network
+    environment:
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
+      
+  passenger_jruby_without_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.jruby-without-app
+    hostname: 'passenger_jruby_without_app'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s  # Longer startup time for JRuby
+    networks:
+      - test_network
+    environment:
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
+      
+  # Standalone JRuby application (using our custom Dockerfile)
+  monitus_jruby_standalone:
+    build:
+      context: ../src
+      dockerfile: Dockerfile.jruby
+    hostname: 'monitus_jruby_standalone'
+    ports:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - test_network
+    environment:
+      - RACK_ENV=production
+      - PORT=8080
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+      
+  test:
+    image: "phusion/passenger-ruby32:2.5.1"
+    command: ["/src/test/run_all_tests.sh"]
+    depends_on:
+      passenger_with_app:
+        condition: service_healthy
+      passenger_without_app:
+        condition: service_healthy
+      passenger_with_visible_prometheus:
+        condition: service_healthy
+    volumes:
+      - ../:/src
+    networks:
+      - test_network
+    working_dir: /src
+    
+  test_jruby:
+    image: "phusion/passenger-jruby94:2.5.1"
+    command: ["/src/test/run_jruby_tests.sh"]
+    depends_on:
+      passenger_jruby_with_app:
+        condition: service_healthy
+      passenger_jruby_without_app:
+        condition: service_healthy
+      monitus_jruby_standalone:
+        condition: service_healthy
+    volumes:
+      - ../:/src
+    networks:
+      - test_network
+    working_dir: /src
+    environment:
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M
+    
+networks:
+  test_network:
+    driver: bridge

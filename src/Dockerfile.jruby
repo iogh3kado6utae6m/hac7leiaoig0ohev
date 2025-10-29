@@ -1,0 +1,76 @@
+# --- Stage 1: Builder image ---
+FROM jruby:9.4-jdk17 AS builder
+
+# Set JRuby-specific environment variables
+ENV JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx2G -Xms512M" \
+    MALLOC_ARENA_MAX=2
+
+WORKDIR /app
+
+# Install system dependencies needed for some gems
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy JRuby-specific Gemfile
+COPY Gemfile.jruby Gemfile
+
+# Install bundler and gems
+RUN gem install bundler:2.4.22 && \
+    bundle config set --local deployment true && \
+    bundle config set --local without 'development test' && \
+    bundle install --jobs=4 --retry=3
+
+# Copy application code
+COPY . .
+
+# --- Stage 2: Runtime image ---
+FROM jruby:9.4-jdk17-slim
+
+# Runtime environment variables
+ENV RACK_ENV=production \
+    PORT=8080 \
+    LOG_LEVEL=info \
+    JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
+    MALLOC_ARENA_MAX=2
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy application and dependencies from builder
+COPY --from=builder /app /app
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+EXPOSE 8080
+
+# Configure graceful shutdown
+STOPSIGNAL SIGTERM
+
+# JRuby-optimized healthcheck
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=30s \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Use Puma server (better for JRuby than Thin)
+# Puma config optimized for JRuby
+CMD ["bundle", "exec", "puma", \
+     "-C", "config/puma.rb", \
+     "-b", "tcp://0.0.0.0:8080", \
+     "-e", "production", \
+     "-t", "8:32", \
+     "--preload", \
+     "config.ru"]

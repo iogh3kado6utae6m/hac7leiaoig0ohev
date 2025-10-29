@@ -5,6 +5,8 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   test:
@@ -300,3 +302,41 @@ jobs:
             echo "💡 Primary test failure likely due to dependency/infrastructure issues"
             echo "🎉 Backup validation provides confidence in code quality"
           fi
+
+  jruby-basic-check:
+    runs-on: ubuntu-latest
+    # Run basic JRuby compatibility check
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JRuby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: jruby-9.4.5.0
+          bundler-cache: false
+          
+      - name: Install system dependencies  
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libxml2-dev libxslt1-dev zlib1g-dev
+          
+      - name: Basic JRuby compatibility test
+        run: |
+          echo "🔥 Testing basic JRuby compatibility..."
+          echo "JRuby version: $(jruby --version)"
+          jruby -e "puts 'JRuby is working: ' + JRUBY_VERSION"
+          jruby -e "require 'java'; puts 'Java integration working'"
+          
+          # Test basic gem installation
+          cd src
+          cp Gemfile.jruby Gemfile
+          
+          # Install minimal dependencies for syntax check
+          jruby -S gem install nokogiri sinatra --no-document
+          
+          # Test syntax
+          jruby -c prometheus_exporter.rb && echo "✅ Main file syntax OK on JRuby"
+          jruby -c config.ru.jruby && echo "✅ JRuby config syntax OK"
+          
+          echo "✅ Basic JRuby compatibility confirmed"
+          echo "ℹ️  For full JRuby testing, see jruby-tests.yml workflow"

@@ -1,0 +1,87 @@
+# CI-optimized Docker Compose configuration with JRuby support
+services:
+  # JRuby variants for CI testing
+  passenger_jruby_with_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.jruby-with-app
+    hostname: 'passenger_jruby_with_app'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 90s  # Longer for CI and JRuby startup
+    networks:
+      - test_network
+    environment:
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
+      
+  passenger_jruby_without_app:
+    build:
+      context: ../
+      dockerfile: test/dockerfiles/Dockerfile.jruby-without-app
+    hostname: 'passenger_jruby_without_app'
+    ports:
+      - "10254"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/monitus/metrics"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 90s  # Longer for CI and JRuby startup
+    networks:
+      - test_network
+    environment:
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
+      
+  # Standalone JRuby application for CI
+  monitus_jruby_standalone:
+    build:
+      context: ../src
+      dockerfile: Dockerfile.jruby
+    hostname: 'monitus_jruby_standalone'
+    ports:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s  # JRuby needs more time to warm up
+    networks:
+      - test_network
+    environment:
+      - RACK_ENV=production
+      - PORT=8080
+      - LOG_LEVEL=info
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+      
+  test_jruby:
+    image: "jruby:9.4-jdk17"
+    command: ["/src/test/run_jruby_tests.sh"]
+    depends_on:
+      passenger_jruby_with_app:
+        condition: service_healthy
+      passenger_jruby_without_app:
+        condition: service_healthy
+      monitus_jruby_standalone:
+        condition: service_healthy
+    volumes:
+      - ../:/src
+    networks:
+      - test_network
+    working_dir: /src
+    environment:
+      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
+      - CI=true
+    
+networks:
+  test_network:
+    driver: bridge

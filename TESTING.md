@@ -26,10 +26,19 @@ The testing system uses Docker Compose with three distinct scenarios:
 
 ### Test Scenarios
 
+#### MRI Ruby Scenarios
 | Scenario | Purpose | Configuration |
 |----------|---------|---------------|
 | **passenger_with_app** | Tests with a running Rails/Sinatra app | Uses dummy-app + monitor |
 | **passenger_without_app** | Tests monitor-only deployment | Monitor application only |
+| **passenger_with_visible_prometheus** | Tests with metrics visible | Monitor + visible prometheus metrics |
+
+#### JRuby Scenarios  
+| Scenario | Purpose | Configuration |
+|----------|---------|---------------|
+| **passenger_jruby_with_app** | JRuby with running application | JRuby + Passenger + dummy-app |
+| **passenger_jruby_without_app** | JRuby monitor-only | JRuby + Passenger + monitor only |
+| **monitus_jruby_standalone** | Standalone JRuby application | JRuby + Puma + Sinatra (no Passenger) |
 | **passenger_with_visible_prometheus** | Tests when exporter metrics are visible | Modified nginx config |
 
 ## Running Tests
@@ -48,6 +57,14 @@ make integration-test
 
 # CI-style testing with relaxed timeouts
 make integration-test-ci
+
+# JRuby-specific testing
+make jruby-test         # Full JRuby integration testing
+make jruby-build        # Build JRuby Docker images only
+make jruby-clean        # Clean JRuby resources
+
+# Combined testing (MRI + JRuby)
+make test-all           # Test both Ruby implementations
 ```
 
 ### Individual Components

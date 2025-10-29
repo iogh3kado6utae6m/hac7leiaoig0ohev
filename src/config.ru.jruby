@@ -1,0 +1,72 @@
+require "bundler/setup"
+
+# JRuby-specific optimizations
+if defined?(JRUBY_VERSION)
+  # Enable JRuby optimizations
+  require 'java'
+  
+  # Set JRuby runtime properties for better performance
+  Java::JavaLang::System.setProperty('jruby.compile.invokedynamic', 'true')
+  Java::JavaLang::System.setProperty('jruby.thread.pool.enabled', 'true')
+  
+  # Use faster JSON library for JRuby if available
+  begin
+    require 'jrjackson'
+    # Replace standard JSON with JrJackson for better performance
+    JSON = JrJackson::Json
+  rescue LoadError
+    # Fall back to standard JSON if JrJackson is not available
+    require 'json'
+  end
+else
+  require 'json'
+end
+
+# Load the main application
+require_relative "prometheus_exporter"
+
+# Add health check middleware
+class HealthCheckMiddleware
+  def initialize(app)
+    @app = app
+  end
+  
+  def call(env)
+    if env['PATH_INFO'] == '/health'
+      [200, {'Content-Type' => 'text/plain'}, ['OK']]
+    else
+      @app.call(env)
+    end
+  end
+end
+
+# Configure middleware stack
+use HealthCheckMiddleware
+
+# Add request logging middleware
+use Rack::CommonLogger, $stdout
+
+# Add request timing middleware for monitoring
+class RequestTimingMiddleware
+  def initialize(app)
+    @app = app
+  end
+  
+  def call(env)
+    start_time = Time.now
+    status, headers, response = @app.call(env)
+    duration = Time.now - start_time
+    
+    # Log request timing (helpful for JRuby performance monitoring)
+    if ENV['LOG_LEVEL'] == 'debug'
+      puts "Request to #{env['PATH_INFO']} took #{duration.round(3)}s"
+    end
+    
+    [status, headers, response]
+  end
+end
+
+use RequestTimingMiddleware if ENV['RACK_ENV'] == 'development'
+
+# Run the main application
+run PrometheusExporterApp
