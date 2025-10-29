@@ -1,5 +1,5 @@
 # JRuby-based Passenger container without application (monitoring only)
-FROM phusion/passenger-jruby94:2.5.1
+FROM phusion/passenger-jruby93:2.5.1
 
 ENV PASSENGER_DISABLE_SECURITY_UPDATE_CHECK=true \
     HOME=/app \

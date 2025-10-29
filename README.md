@@ -56,7 +56,7 @@ passenger_processes_active{supergroup_name="/app (development)",group_name="/app
 ```
 
 ## Requirements
-* a Ruby interpreter in the path (MRI Ruby 2.3+ or JRuby 9.4+)
+* a Ruby interpreter in the path (MRI Ruby 2.3+ or JRuby 9.3+)
 * the Nokogiri gem (tested with 1.10.0+)
 * the Sinatra gem (tested with 2.0.5+)
 

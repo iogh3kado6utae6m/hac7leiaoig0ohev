@@ -127,7 +127,7 @@ services:
     working_dir: /src
     
   test_jruby:
-    image: "phusion/passenger-jruby94:2.5.1"
+    image: "phusion/passenger-jruby93:2.5.1"
     command: ["/src/test/run_jruby_tests.sh"]
     depends_on:
       passenger_jruby_with_app:
