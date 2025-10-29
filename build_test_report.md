@@ -112,4 +112,21 @@ Install missing gem executables with `bundle install`
 
 **Validation:** Added `test-docker-jruby.sh` script for pre-build checks.
 
-**Status:** ✅ **Fully Resolved** - JRuby Docker build and run should now work correctly.
+### Gem Dependency Conflict (Follow-up #3)
+
+**Issue:** After fixing runtime bundler, Docker run failed with:
+```
+Bundler::GemNotFound: Could not find gem 'thin' in locally installed gems.
+```
+
+**Cause:** JRuby Gemfile included `faye-websocket` which depends on EventMachine/thin, but these gems conflict with JRuby's threading model and aren't needed for the core prometheus exporter.
+
+**Solution:**
+- Simplified Gemfile.jruby to include only essential gems
+- Removed `faye-websocket`, `thin`, and `maxminddb` dependencies  
+- Added comments explaining disabled features
+- Core prometheus exporter doesn't need WebSocket or GeoIP functionality
+
+**Minimal JRuby Gemfile:** Only includes nokogiri, sinatra, puma, prometheus-client, and JRuby optimizations.
+
+**Status:** ✅ **Fully Resolved** - JRuby Docker build and run should now work with minimal dependencies.

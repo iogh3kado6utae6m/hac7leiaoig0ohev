@@ -22,3 +22,9 @@ echo -e "\n3. Bundle configuration check:"
 grep -A 3 -B 3 "bundle config" Dockerfile.jruby
 
 echo -e "\n✅ Pre-build validation completed"
+
+echo "4. JRuby Gemfile validation:"
+echo "Checking JRuby-specific gem configuration:"
+grep -c "nokogiri\|sinatra\|puma\|prometheus-client" Gemfile.jruby && echo "✅ Core gems present"
+! grep "^gem.*thin" Gemfile.jruby && echo "✅ No thin dependency (avoids EventMachine conflicts)"
+! grep "^gem.*faye-websocket" Gemfile.jruby && echo "✅ No faye-websocket dependency (not needed for core app)"
