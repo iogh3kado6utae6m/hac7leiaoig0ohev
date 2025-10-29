@@ -29,6 +29,5 @@ gem 'jrjackson', platforms: :jruby       # Fast JSON parsing
 gem 'minitest'   # Test framework
 
 # Development and testing dependencies
-group :development, :test do
-  gem 'rack-test'
-end
+# Note: rack-test removed as it's not needed for production builds
+# and causes bundler issues when test group is excluded
