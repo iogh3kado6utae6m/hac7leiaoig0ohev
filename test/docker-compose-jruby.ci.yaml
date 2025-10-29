@@ -63,7 +63,7 @@ services:
       - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200
       
   test_jruby:
-    image: "jruby:9.4-jdk17"
+    image: "jruby:9.4"
     command: ["/src/test/run_jruby_tests.sh"]
     depends_on:
       passenger_jruby_with_app:

@@ -139,11 +139,11 @@ end
 
 ```dockerfile
 # Stage 1: Builder
-FROM jruby:9.4-jdk17 AS builder
+FROM jruby:9.4 AS builder
 # ... установка зависимостей
 
 # Stage 2: Runtime
-FROM jruby:9.4-jdk17-slim
+FROM jruby:9.4
 # ... финальный образ
 ```
 

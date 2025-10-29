@@ -1,5 +1,6 @@
 # --- Stage 1: Builder image ---
-FROM jruby:9.4-jdk17 AS builder
+# Use jruby:9.4 instead of jruby:9.4-jdk17 as the latter doesn't exist in Docker Hub
+FROM jruby:9.4 AS builder
 
 # Set JRuby-specific environment variables
 ENV JRUBY_OPTS="-Xcompile.invokedynamic=true" \
@@ -28,7 +29,8 @@ RUN gem install bundler:2.4.22 && \
 COPY . .
 
 # --- Stage 2: Runtime image ---
-FROM jruby:9.4-jdk17-slim
+# Use jruby:9.4 as the base runtime image
+FROM jruby:9.4
 
 # Runtime environment variables
 ENV RACK_ENV=production \
