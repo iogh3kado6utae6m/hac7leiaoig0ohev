@@ -20,8 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY Gemfile.jruby Gemfile
 
 # Install bundler and gems
+# Use path vendor/bundle for consistent gem installation
 RUN gem install bundler:2.4.22 && \
-    bundle config set --local deployment true && \
+    bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
     bundle install --jobs=4 --retry=3
 

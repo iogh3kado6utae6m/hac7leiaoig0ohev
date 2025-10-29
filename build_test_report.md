@@ -79,4 +79,18 @@ Updated all references to use the correct base image: `jruby:9.4`
 docker build -f src/Dockerfile.jruby -t monitus-jruby src/
 ```
 
-**Status:** ✅ **Resolved** - All JRuby Docker builds should now work correctly.
+### Bundler Deployment Mode Issue (Follow-up)
+
+**Issue:** After fixing image references, build failed with:
+```
+The deployment setting requires a lockfile. Please make sure you have checked your Gemfile.lock into version control before deploying.
+```
+
+**Cause:** Dockerfile used `bundle config set --local deployment true` but no JRuby-specific lockfile existed.
+
+**Solution:** 
+- Removed deployment mode from Dockerfile.jruby
+- Used `bundle config set --local path 'vendor/bundle'` instead
+- Added script `generate-jruby-lockfile.sh` for future lockfile generation if needed
+
+**Status:** ✅ **Fully Resolved** - All JRuby Docker builds should now work correctly.

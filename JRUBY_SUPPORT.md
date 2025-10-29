@@ -36,7 +36,8 @@ Monitus теперь поддерживает запуск на JRuby в Docker 
 ### 1. Standalone JRuby приложение
 
 ```bash
-# Сборка JRuby Docker образа
+# Сборка JRuby Docker образа  
+# Note: Uses vendor/bundle path instead of deployment mode for flexibility
 docker build -f src/Dockerfile.jruby -t monitus-jruby src/
 
 # Запуск
