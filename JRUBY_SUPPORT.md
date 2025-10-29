@@ -244,6 +244,18 @@ jruby -S gem list | grep problematic_gem
 gem install jruby-openssl
 ```
 
+#### 5. CI/CD версии JRuby
+```bash
+# Если версия недоступна в setup-ruby, используйте более старую:
+# Проверить доступные версии:
+# https://github.com/ruby/setup-ruby#supported-versions
+
+# Обновить в .github/workflows/*.yml:
+# ruby-version: jruby-9.3.10.0  # вместо 9.4.x
+
+# Или добавить fallback механизм в CI
+```
+
 ### Логи и диагностика
 
 ```bash
