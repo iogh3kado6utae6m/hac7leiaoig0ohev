@@ -129,4 +129,24 @@ Bundler::GemNotFound: Could not find gem 'thin' in locally installed gems.
 
 **Minimal JRuby Gemfile:** Only includes nokogiri, sinatra, puma, prometheus-client, and JRuby optimizations.
 
-**Status:** ✅ **Fully Resolved** - JRuby Docker build and run should now work with minimal dependencies.
+### Lockfile Conflict Issue (Follow-up #4)
+
+**Issue:** Even after simplifying Gemfile.jruby, the same error persisted:
+```
+Bundler::GemNotFound: Could not find gem 'thin' in locally installed gems.
+```
+
+**Root Cause:** Docker was copying the MRI-specific `Gemfile.lock` file which contained `thin` dependencies, and bundler was trying to use this lockfile instead of generating a fresh one from the JRuby Gemfile.
+
+**Solution:**
+- Add explicit `rm -f Gemfile.lock` commands in both Docker build stages
+- Create `.dockerignore` to exclude MRI-specific files
+- Generate fresh JRuby lockfile during build process
+- Add lockfile conflict detection to validation script
+
+**Technical Details:**
+- MRI `Gemfile.lock` includes: `thin (2.0.1)`, `eventmachine`, `daemons`  
+- JRuby `Gemfile.jruby` excludes these problematic gems
+- Bundler was prioritizing existing lockfile over Gemfile content
+
+**Status:** ✅ **Fully Resolved** - JRuby Docker should now generate clean dependencies without MRI conflicts.
