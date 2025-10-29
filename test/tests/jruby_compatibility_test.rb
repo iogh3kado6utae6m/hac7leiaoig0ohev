@@ -168,22 +168,33 @@ describe "JRuby compatibility" do
         require_relative "../../src/prometheus_exporter"
       end
       require 'rack/test'
+      require 'stringio'
       
-      include Rack::Test::Methods
+      # Test that we can create a Rack app instance
+      app = PrometheusExporterApp.new
+      assert_respond_to app, :call, "App should respond to Rack call method"
       
-      def app
-        PrometheusExporterApp
-      end
+      # Test basic Rack environment call (simplified test without HTTP methods)
+      env = {
+        'REQUEST_METHOD' => 'GET',
+        'PATH_INFO' => '/monitus/metrics',
+        'QUERY_STRING' => '',
+        'rack.input' => StringIO.new,
+        'rack.errors' => StringIO.new
+      }
       
       # Note: This test might not work fully without actual passenger-status
       # but we can test that the app doesn't crash
       begin
-        get '/monitus/metrics'
-        assert last_response.status != 500, "Should not return server error"
+        status, headers, body = app.call(env)
+        assert status.is_a?(Integer), "Should return HTTP status code"
+        assert status != 500, "Should not return server error (got #{status})"
+        puts "JRuby Rack app responded with status: #{status}"
       rescue => e
         # Expected to fail without passenger-status, but shouldn't crash the JRuby process
         assert e.message.length > 0, "Error should have a message"
         puts "Expected error (no passenger-status): #{e.message}"
+        # This is acceptable - the important thing is JRuby didn't crash
       end
     end
   end
