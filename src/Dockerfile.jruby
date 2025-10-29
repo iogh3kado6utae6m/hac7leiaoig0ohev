@@ -60,12 +60,13 @@ RUN gem install bundler:2.4.22
 # Copy application and dependencies from builder
 COPY --from=builder /app /app
 
-# Configure bundler to use the same path as in builder stage
-RUN bundle config set --local path 'vendor/bundle' && \
+# Configure bundler and ensure clean state
+RUN rm -rf .bundle/ Gemfile.lock && \
+    bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
-    rm -f Gemfile.lock && echo "Ensured no conflicting lockfile in runtime" && \
-    ls -la vendor/bundle/ || echo "Warning: vendor/bundle directory not found" && \
-    bundle list | head -10 || echo "Warning: bundle list failed"
+    echo "Bundler configuration:" && bundle config list && \
+    echo "Checking installed gems:" && \
+    ls -la vendor/bundle/jruby/*/gems/ 2>/dev/null | head -20 || echo "Gems directory not found"
 
 # Note: Running as root for simplicity in development
 # In production, consider creating non-root user after ensuring gem access
