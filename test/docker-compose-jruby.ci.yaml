@@ -17,7 +17,7 @@ services:
     networks:
       - test_network
     environment:
-      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JRUBY_OPTS=-Xcompile.invokedynamic=true
       - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
       
   passenger_jruby_without_app:
@@ -36,7 +36,7 @@ services:
     networks:
       - test_network
     environment:
-      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JRUBY_OPTS=-Xcompile.invokedynamic=true
       - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
       
   # Standalone JRuby application for CI
@@ -59,7 +59,7 @@ services:
       - RACK_ENV=production
       - PORT=8080
       - LOG_LEVEL=info
-      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JRUBY_OPTS=-Xcompile.invokedynamic=true
       - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200
       
   test_jruby:
@@ -78,7 +78,7 @@ services:
       - test_network
     working_dir: /src
     environment:
-      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JRUBY_OPTS=-Xcompile.invokedynamic=true
       - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC
       - CI=true
     

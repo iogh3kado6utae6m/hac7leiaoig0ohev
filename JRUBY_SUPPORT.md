@@ -41,7 +41,7 @@ docker build -f src/Dockerfile.jruby -t monitus-jruby src/
 
 # Запуск
 docker run -p 8080:8080 \
-  -e JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
+  -e JRUBY_OPTS="-Xcompile.invokedynamic=true" \
   -e JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC" \
   monitus-jruby
 
@@ -82,7 +82,7 @@ make jruby-clean
 
 ```bash
 # Оптимизация JRuby
-export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+export JRUBY_OPTS="-Xcompile.invokedynamic=true"
 
 # JVM настройки
 export JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
@@ -168,7 +168,7 @@ FROM jruby:9.4-jdk17-slim
 
 2. **JRuby optimizations**:
    ```bash
-   JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+   JRUBY_OPTS="-Xcompile.invokedynamic=true"
    ```
 
 3. **Warm-up period**:
@@ -277,7 +277,7 @@ JRUBY_OPTS="--profile.api"
 
 ```bash
 # Aggressive JIT compilation
-JRUBY_OPTS="--server -Xcompile.invokedynamic=true -Xcompile.mode=JIT"
+JRUBY_OPTS="-Xcompile.invokedynamic=true -Xcompile.mode=JIT"
 
 # Larger heap for high load
 JAVA_OPTS="-Xmx4G -Xms1G -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
@@ -312,7 +312,7 @@ spec:
         - containerPort: 8080
         env:
         - name: JRUBY_OPTS
-          value: "--server -Xcompile.invokedynamic=true"
+          value: "-Xcompile.invokedynamic=true"
         - name: JAVA_OPTS
           value: "-Xmx1G -Xms256M -XX:+UseG1GC"
         resources:
@@ -348,7 +348,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - JRUBY_OPTS=--server -Xcompile.invokedynamic=true
+      - JRUBY_OPTS=-Xcompile.invokedynamic=true
       - JAVA_OPTS=-Xmx2G -Xms512M -XX:+UseG1GC -XX:MaxGCPauseMillis=200
       - RACK_ENV=production
     deploy:

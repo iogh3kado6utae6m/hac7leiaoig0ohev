@@ -3,7 +3,7 @@ FROM phusion/passenger-jruby94:2.5.1
 
 ENV PASSENGER_DISABLE_SECURITY_UPDATE_CHECK=true \
     HOME=/app \
-    JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
     JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC"
 
 WORKDIR /app

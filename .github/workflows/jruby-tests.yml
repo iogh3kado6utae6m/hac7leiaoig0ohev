@@ -76,7 +76,7 @@ jobs:
           bundle config set --local path 'vendor/bundle'
           
           # Set JRuby optimization flags
-          export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+          export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           export JAVA_OPTS="-Xmx2G -Xms512M -XX:+UseG1GC"
           
           bundle install --jobs 4 --retry 3
@@ -94,8 +94,8 @@ jobs:
           echo "🔍 Running JRuby syntax validation..."
           cd src
           
-          # Set JRuby opts for better performance
-          export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+          # Set JRuby opts for better performance (skip deprecated --server flag)
+          export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           
           jruby -c prometheus_exporter.rb
           jruby -c config.ru.jruby
@@ -110,8 +110,8 @@ jobs:
           echo "🧪 Running JRuby unit tests..."
           cd src
           
-          # Set JRuby optimization environment
-          export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+          # Set JRuby optimization environment (skip deprecated --server flag)
+          export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           export JAVA_OPTS="-Xmx2G -Xms512M -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
           
           # Use JRuby-optimized config
@@ -119,7 +119,7 @@ jobs:
           cp Gemfile.jruby Gemfile
           
           jruby -S bundle exec ruby -e "
-            require_relative 'prometheus_exporter'
+            require './prometheus_exporter'
             
             # Test basic class loading
             app = PrometheusExporterApp.new
@@ -156,8 +156,8 @@ jobs:
           echo "🔬 Running JRuby compatibility tests..."
           cd test
           
-          # Set JRuby optimization environment
-          export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+          # Set JRuby optimization environment (skip deprecated --server flag)
+          export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           export JAVA_OPTS="-Xmx2G -Xms512M -XX:+UseG1GC"
           
           jruby -S bundle exec ruby tests/jruby_compatibility_test.rb
@@ -198,14 +198,14 @@ jobs:
           echo "⚡ Running JRuby performance benchmark..."
           cd src
           
-          export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+          export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           export JAVA_OPTS="-Xmx2G -Xms512M -XX:+UseG1GC"
           
           cp Gemfile.jruby Gemfile
           cp config.ru.jruby config.ru
           
           jruby -S bundle exec ruby -e "
-            require_relative 'prometheus_exporter'
+            require './prometheus_exporter'
             require 'benchmark'
             
             app = PrometheusExporterApp.new

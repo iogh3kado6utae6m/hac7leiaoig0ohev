@@ -2,7 +2,7 @@
 FROM jruby:9.4-jdk17 AS builder
 
 # Set JRuby-specific environment variables
-ENV JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
+ENV JRUBY_OPTS="-Xcompile.invokedynamic=true" \
     JAVA_OPTS="-Xmx2G -Xms512M" \
     MALLOC_ARENA_MAX=2
 
@@ -34,7 +34,7 @@ FROM jruby:9.4-jdk17-slim
 ENV RACK_ENV=production \
     PORT=8080 \
     LOG_LEVEL=info \
-    JRUBY_OPTS="--server -Xcompile.invokedynamic=true" \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
     JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
     MALLOC_ARENA_MAX=2
 

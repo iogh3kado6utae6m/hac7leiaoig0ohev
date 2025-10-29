@@ -23,7 +23,12 @@ else
 end
 
 # Load the main application
-require_relative "prometheus_exporter"
+# Try relative path first, fall back to absolute path for CI environments
+begin
+  require_relative "prometheus_exporter"
+rescue LoadError
+  require "./prometheus_exporter"
+end
 
 # Add health check middleware
 class HealthCheckMiddleware

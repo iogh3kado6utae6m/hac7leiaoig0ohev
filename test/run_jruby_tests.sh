@@ -7,7 +7,7 @@ echo "JRuby Version: $(jruby --version)"
 echo "Java Version: $(java -version 2>&1 | head -n 1)"
 
 # Set JRuby optimizations
-export JRUBY_OPTS="--server -Xcompile.invokedynamic=true"
+export JRUBY_OPTS="-Xcompile.invokedynamic=true"
 export JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC"
 
 # Install test dependencies if not already installed
