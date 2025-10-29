@@ -52,3 +52,31 @@ Environment: Linux container without Docker support
 
 ## Conclusion
 ✅ **Build system is functional and ready for deployment**
+
+## JRuby Docker Image Fix (2024-10-29)
+
+### Issue
+Docker build failed with error: `jruby:9.4-jdk17-slim: not found`
+
+### Root Cause  
+The Dockerfile referenced non-existent JRuby Docker images:
+- `jruby:9.4-jdk17` 
+- `jruby:9.4-jdk17-slim`
+
+These images don't exist in Docker Hub's official JRuby repository.
+
+### Solution
+Updated all references to use the correct base image: `jruby:9.4`
+
+**Files modified:**
+- `src/Dockerfile.jruby` - Fixed base image references in both build stages
+- `JRUBY_SUPPORT.md` - Updated documentation examples  
+- `test/docker-compose-jruby.ci.yaml` - Fixed test container image
+
+### Verification
+```bash
+# Now works correctly:
+docker build -f src/Dockerfile.jruby -t monitus-jruby src/
+```
+
+**Status:** ✅ **Resolved** - All JRuby Docker builds should now work correctly.
