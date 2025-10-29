@@ -37,30 +37,30 @@ else
   activate_control_app 'tcp://127.0.0.1:9293', { no_token: true }
 end
 
-# Worker and thread management
+# Worker and thread management (updated for Puma v7+)
+before_worker_boot do
+  # Code to run before forking workers
+  puts "Preparing to fork workers"
+end
+
 on_worker_boot do
   # Code to run when a worker starts
   puts "Worker #{Process.pid} started"
 end
 
-before_fork do
-  # Code to run before forking workers
-  puts "Preparing to fork workers"
-end
-
 # Graceful shutdown configuration
-on_worker_shutdown do
+before_worker_shutdown do
   puts "Worker #{Process.pid} shutting down"
 end
 
 # JRuby-specific optimizations
 if defined?(JRUBY_VERSION)
-  # Enable JRuby's invoke dynamic for better performance
-  require 'java'
-  java_system_property 'jruby.compile.invokedynamic', 'true'
+  # JRuby system properties should be set via environment variables or Java system properties
+  # These are typically set via JRUBY_OPTS or JAVA_OPTS environment variables
+  # rather than programmatically in Puma config
   
-  # Optimize garbage collection
-  java_system_property 'jruby.gc.options', '-XX:+UseG1GC -XX:MaxGCPauseMillis=200'
+  puts "JRuby detected: #{JRUBY_VERSION}"
+  puts "Java version: #{java.lang.System.getProperty('java.version')}" if defined?(java)
 end
 
 # Health check endpoint

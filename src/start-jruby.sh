@@ -21,20 +21,22 @@ ls -la vendor/bundle/jruby/*/gems/ 2>/dev/null | head -10 || echo "No gems direc
 # Try to start puma with different approaches
 echo "Attempting to start Puma..."
 
-# Method 1: Try bundle exec (normal approach)
-echo "Method 1: Trying bundle exec puma..."
-bundle exec puma -C config/puma.rb -b tcp://0.0.0.0:8080 -e production -t 8:32 --preload config.ru.jruby &
-PID1=$!
-sleep 3
-
-# Check if it started successfully
-if kill -0 $PID1 2>/dev/null; then
-    echo "Bundle exec puma started successfully!"
-    wait $PID1
+# Method 1: Try bundle exec with JRuby config (normal approach)
+echo "Method 1: Trying bundle exec puma with JRuby config..."
+if bundle exec puma -C config/puma.rb config.ru.jruby; then
+    echo "Bundle exec puma started successfully with JRuby config!"
 else
-    echo "Bundle exec failed, trying simple config..."
+    echo "JRuby config failed, trying standard config..."
     
-    # Method 2: Direct puma with simple config (fallback)
-    echo "Method 2: Trying direct puma with simple config..."
-    puma -C config/puma.rb -b tcp://0.0.0.0:8080 -e production -t 8:32 --preload simple-config.ru
+    # Method 2: Try standard config.ru
+    echo "Method 2: Trying bundle exec with standard config..."
+    if bundle exec puma -C config/puma.rb config.ru; then
+        echo "Standard config worked!"
+    else
+        echo "Bundle exec failed, trying simple config..."
+        
+        # Method 3: Direct puma with simple config (fallback)
+        echo "Method 3: Trying direct puma with simple config..."
+        puma -C config/puma.rb simple-config.ru
+    fi
 fi

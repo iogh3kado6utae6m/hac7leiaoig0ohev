@@ -2,32 +2,59 @@ require "bundler/setup"
 
 # JRuby-specific optimizations
 if defined?(JRUBY_VERSION)
-  # Enable JRuby optimizations
-  require 'java'
+  puts "Running on JRuby #{JRUBY_VERSION}"
   
-  # Set JRuby runtime properties for better performance
-  Java::JavaLang::System.setProperty('jruby.compile.invokedynamic', 'true')
-  Java::JavaLang::System.setProperty('jruby.thread.pool.enabled', 'true')
+  # JRuby system properties are better set via environment variables
+  # but we can still set some programmatically if needed
+  begin
+    require 'java'
+    
+    # Only set properties if not already set via environment
+    unless ENV['JRUBY_OPTS']&.include?('invokedynamic')
+      Java::JavaLang::System.setProperty('jruby.compile.invokedynamic', 'true')
+    end
+    Java::JavaLang::System.setProperty('jruby.thread.pool.enabled', 'true')
+    
+    puts "JRuby optimizations applied"
+  rescue => e
+    puts "Warning: Could not set JRuby optimizations: #{e.message}"
+  end
   
   # Use faster JSON library for JRuby if available
   begin
     require 'jrjackson'
     # Replace standard JSON with JrJackson for better performance
     JSON = JrJackson::Json
+    puts "Using JrJackson for JSON parsing"
   rescue LoadError
     # Fall back to standard JSON if JrJackson is not available
     require 'json'
+    puts "Using standard JSON library"
   end
 else
   require 'json'
 end
 
-# Load the main application
-# Try relative path first, fall back to absolute path for CI environments
+# Determine which application to load based on available files
+app_to_load = nil
+
+# First try to load the main prometheus exporter app
 begin
   require_relative "prometheus_exporter"
-rescue LoadError
-  require "./prometheus_exporter"
+  app_to_load = PrometheusExporterApp
+  puts "Loaded PrometheusExporterApp"
+rescue LoadError => e
+  puts "Could not load prometheus_exporter: #{e.message}"
+  
+  # Fallback to victima app if prometheus exporter fails
+  begin
+    require_relative "victima"
+    app_to_load = TargetApp
+    puts "Loaded TargetApp as fallback"
+  rescue LoadError => e2
+    puts "Could not load victima either: #{e2.message}"
+    raise "No application could be loaded"
+  end
 end
 
 # Add health check middleware
@@ -73,5 +100,14 @@ end
 
 use RequestTimingMiddleware if ENV['RACK_ENV'] == 'development'
 
-# Run the main application
-run PrometheusExporterApp
+# Run the detected application
+if app_to_load
+  puts "Starting #{app_to_load.name}..."
+  run app_to_load
+else
+  # Ultimate fallback - simple health check app
+  puts "Using fallback health check app"
+  run ->(env) {
+    [200, {'Content-Type' => 'text/plain'}, ['JRuby Health Check OK']]
+  }
+end
