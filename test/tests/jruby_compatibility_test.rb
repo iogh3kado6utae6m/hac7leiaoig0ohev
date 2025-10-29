@@ -193,7 +193,7 @@ describe "JRuby compatibility" do
         assert status.is_a?(Integer), "Should return HTTP status code"
         # In testing environment without passenger-status, 500 is expected due to XML parsing errors
         # The important test is that JRuby doesn't crash and returns a proper HTTP response
-        assert [200, 500].include?(status), "Should return valid HTTP status code (got #{status})"
+        assert_valid_test_http_status(status, "Should return valid HTTP status code (got #{status})")
         puts "JRuby Rack app responded with status: #{status}"
         
         if status == 500
