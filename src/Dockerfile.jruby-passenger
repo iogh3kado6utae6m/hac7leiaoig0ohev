@@ -1,0 +1,105 @@
+# JRuby + Phusion Passenger + Nginx Dockerfile
+# High-performance production setup for JRuby applications
+
+FROM phusion/passenger-ruby32:3.0.21
+
+# Set JRuby and environment variables
+ENV JRUBY_VERSION=9.4.14.0 \
+    RACK_ENV=production \
+    PORT=80 \
+    LOG_LEVEL=info \
+    # JRuby optimizations
+    JRUBY_OPTS="-Xcompile.invokedynamic=true -J-Djnr.ffi.asm.enabled=false" \
+    JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djnr.netdb.provider=files" \
+    MALLOC_ARENA_MAX=2 \
+    # Passenger configuration
+    PASSENGER_APP_ENV=production \
+    PASSENGER_MIN_INSTANCES=2 \
+    PASSENGER_MAX_INSTANCES=8 \
+    PASSENGER_CONCURRENCY_MODEL=thread \
+    PASSENGER_THREAD_COUNT=16
+
+# Install system dependencies for JRuby
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Java runtime (required for JRuby)
+    openjdk-17-jdk-headless \
+    # Build tools for native gems
+    build-essential \
+    git \
+    curl \
+    wget \
+    # XML processing libraries
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    # Network utilities
+    net-tools \
+    netbase \
+    ca-certificates \
+    # Clean up
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install JRuby
+RUN cd /tmp \
+    && wget -q https://repo1.maven.org/maven2/org/jruby/jruby-dist/${JRUBY_VERSION}/jruby-dist-${JRUBY_VERSION}-bin.tar.gz \
+    && tar -xzf jruby-dist-${JRUBY_VERSION}-bin.tar.gz \
+    && mv jruby-${JRUBY_VERSION} /opt/jruby \
+    && ln -s /opt/jruby/bin/jruby /usr/local/bin/jruby \
+    && ln -s /opt/jruby/bin/gem /usr/local/bin/jgem \
+    && ln -s /opt/jruby/bin/bundle /usr/local/bin/jbundle \
+    && rm -rf /tmp/jruby-dist-${JRUBY_VERSION}-bin.tar.gz
+
+# Verify JRuby installation
+RUN jruby --version && java -version
+
+# Install bundler for JRuby
+RUN jgem install bundler:2.4.22
+
+# Configure Passenger for JRuby
+RUN echo 'passenger_ruby /usr/local/bin/jruby;' > /etc/nginx/conf.d/jruby.conf
+
+# Set working directory
+WORKDIR /home/app/webapp
+
+# Copy Gemfile and install dependencies
+COPY Gemfile.jruby-passenger Gemfile
+RUN jbundle config set --local deployment true \
+    && jbundle config set --local path 'vendor/bundle' \
+    && jbundle config set --local without 'development test' \
+    && jbundle install --jobs=4 --retry=3
+
+# Copy application code
+COPY . .
+
+# Remove conflicting lockfiles
+RUN rm -f Gemfile.lock
+
+# Copy Nginx configuration
+COPY nginx-jruby.conf /etc/nginx/sites-enabled/webapp.conf
+RUN rm -f /etc/nginx/sites-enabled/default
+
+# Copy Passenger configuration
+COPY passenger-jruby.conf /etc/nginx/conf.d/passenger-jruby.conf
+
+# Create startup script
+COPY start-passenger-jruby.sh /usr/local/bin/start-passenger-jruby.sh
+RUN chmod +x /usr/local/bin/start-passenger-jruby.sh
+
+# Create directories for logs and runtime
+RUN mkdir -p /var/log/webapp \
+    && chown -R app:app /home/app/webapp \
+    && chown -R app:app /var/log/webapp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+    CMD curl -f http://localhost:80/health || exit 1
+
+# Expose port 80 (Nginx)
+EXPOSE 80
+
+# Configure graceful shutdown
+STOPSIGNAL SIGTERM
+
+# Use our custom startup script
+CMD ["/usr/local/bin/start-passenger-jruby.sh"]

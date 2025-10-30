@@ -1,0 +1,43 @@
+source 'https://rubygems.org'
+
+# JRuby + Passenger optimized gem configuration
+# Core web framework dependencies
+gem 'nokogiri'           # JRuby uses Java XML processing
+gem 'sinatra', '~> 3.0'  # Latest Sinatra with JRuby support  
+gem 'rack', '~> 2.2'     # Stable rack version
+gem 'rackup'             # Required for modern Rack
+
+# Passenger (application server)
+gem 'passenger'          # Phusion Passenger for production
+
+# Metrics (core requirement)
+gem 'prometheus-client'  # Prometheus metrics
+
+# Concurrency and utilities
+gem 'concurrent-ruby'    # Leverages JVM threading
+gem 'logger'
+gem 'ipaddr'
+gem 'json'
+
+# Optional dependencies for full app features
+gem 'faye-websocket'     # WebSocket support
+gem 'maxminddb'          # GeoIP features
+
+# System monitoring gems (optional)
+begin
+  gem 'sys-cpu', platforms: [:ruby, :jruby]
+  gem 'sys-filesystem', platforms: [:ruby, :jruby]
+rescue LoadError
+  # Skip if not available on this platform
+end
+
+# JRuby-specific optimizations (only install on JRuby platform)
+gem 'jruby-openssl', platforms: :jruby   # Enhanced SSL performance
+gem 'jrjackson', platforms: :jruby       # Fast JSON parsing
+
+# Testing dependencies (needed for CI tests)
+gem 'minitest'   # Test framework
+
+# Development and testing dependencies
+# Note: rack-test removed as it causes bundler resolution issues
+# when test group is excluded in Docker builds

@@ -1,0 +1,31 @@
+# Prometheus configuration for JRuby + Passenger monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # JRuby application metrics
+  - job_name: 'jruby-passenger-app'
+    static_configs:
+      - targets: ['jruby-passenger:80']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # Nginx health check
+  - job_name: 'nginx-health'
+    static_configs:
+      - targets: ['jruby-passenger:80']
+    metrics_path: '/nginx-health'
+    scrape_interval: 60s
+    scrape_timeout: 5s
+    
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

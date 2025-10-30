@@ -1,0 +1,81 @@
+# Docker Compose для JRuby + Passenger + Nginx
+version: '3.8'
+
+services:
+  jruby-passenger:
+    build:
+      context: ../src
+      dockerfile: Dockerfile.jruby-passenger
+    image: monitus-jruby-passenger:latest
+    container_name: monitus-jruby-passenger
+    
+    ports:
+      - "8081:80"  # Используем 8081 чтобы не конфликтовать с другими сервисами
+    
+    environment:
+      # JRuby configuration
+      - RACK_ENV=production
+      - JRUBY_OPTS=-Xcompile.invokedynamic=true -J-Djnr.ffi.asm.enabled=false
+      - JAVA_OPTS=-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djnr.netdb.provider=files
+      
+      # Passenger configuration  
+      - PASSENGER_APP_ENV=production
+      - PASSENGER_MIN_INSTANCES=2
+      - PASSENGER_MAX_INSTANCES=6
+      - PASSENGER_THREAD_COUNT=16
+      - PASSENGER_CONCURRENCY_MODEL=thread
+      
+    volumes:
+      # Логи для мониторинга
+      - ./logs/jruby-passenger:/var/log/webapp
+      - ./logs/nginx:/var/log/nginx
+      
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+      
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+          
+    # Networks
+    networks:
+      - jruby-network
+      
+  # Дополнительный сервис для мониторинга (опционально)
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: prometheus-jruby
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-jruby.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - jruby-network
+    depends_on:
+      - jruby-passenger
+
+networks:
+  jruby-network:
+    driver: bridge
+    
+volumes:
+  prometheus_data:
