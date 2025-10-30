@@ -64,8 +64,7 @@ WORKDIR /home/app/webapp
 
 # Copy Gemfile and install dependencies
 COPY Gemfile.jruby-passenger Gemfile
-RUN jbundle config set --local deployment true \
-    && jbundle config set --local path 'vendor/bundle' \
+RUN jbundle config set --local path 'vendor/bundle' \
     && jbundle config set --local without 'development test' \
     && jbundle install --jobs=4 --retry=3
 
@@ -89,7 +88,8 @@ RUN chmod +x /usr/local/bin/start-passenger-jruby.sh
 # Create directories for logs and runtime
 RUN mkdir -p /var/log/webapp \
     && chown -R app:app /home/app/webapp \
-    && chown -R app:app /var/log/webapp
+    && chown -R app:app /var/log/webapp \
+    && chmod -R 755 /home/app/webapp
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
