@@ -1,0 +1,101 @@
+# Ultra-simple JRuby test container
+# Just to verify JRuby + Passenger integration works
+
+FROM phusion/passenger-jruby94:3.0.4
+LABEL maintainer="Monitus Team"
+
+# Environment variables
+ENV RACK_ENV=production \
+    PASSENGER_APP_ENV=production
+
+# Create application directory
+RUN mkdir -p /home/app/webapp && \
+    chown -R app:app /home/app
+
+WORKDIR /home/app/webapp
+
+# Create ultra-simple test application inline
+RUN echo 'source "https://rubygems.org"' > Gemfile && \
+    echo 'gem "sinatra"' >> Gemfile && \
+    echo 'gem "nokogiri"' >> Gemfile && \
+    chown app:app Gemfile
+
+# Install gems
+USER app
+RUN bundle install
+USER root
+
+# Create simple test app
+RUN cat > app.rb << 'EOF'
+require 'sinatra'
+require 'nokogiri'
+
+class TestApp < Sinatra::Base
+  get '/health' do
+    'healthy'
+  end
+  
+  get '/test' do
+    content_type :json
+    {
+      ruby_engine: RUBY_ENGINE,
+      ruby_version: RUBY_VERSION,
+      jruby_version: JRUBY_VERSION,
+      time: Time.now.iso8601,
+      status: 'ok'
+    }.to_json
+  end
+  
+  get '/monitus/metrics' do
+    content_type 'text/plain'
+    # Simple fake metrics
+    <<~METRICS
+      # HELP test_metric A test metric
+      # TYPE test_metric gauge
+      test_metric{source="jruby"} 1
+      
+      # HELP jruby_info JRuby information
+      # TYPE jruby_info gauge  
+      jruby_info{version="#{JRUBY_VERSION}",engine="#{RUBY_ENGINE}"} 1
+    METRICS
+  end
+end
+EOF
+
+# Create config.ru
+RUN echo 'require_relative "app"' > config.ru && \
+    echo 'run TestApp' >> config.ru && \
+    chown -R app:app .
+
+# Simple nginx config
+RUN cat > /etc/nginx/sites-available/webapp.conf << 'EOF'
+server {
+    listen 80;
+    server_name _;
+    root /home/app/webapp/public;
+    
+    passenger_enabled on;
+    passenger_ruby /usr/bin/jruby;
+    passenger_app_env production;
+    passenger_app_root /home/app/webapp;
+    
+    location / {
+        try_files $uri @app;
+    }
+    
+    location @app {
+        # Passenger handles this
+    }
+}
+EOF
+
+RUN rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
+    rm -f /etc/service/nginx/down
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+    CMD curl -f http://localhost/health || exit 1
+
+EXPOSE 80
+CMD ["/sbin/my_init"]
