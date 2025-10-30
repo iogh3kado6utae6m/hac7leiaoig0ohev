@@ -39,6 +39,9 @@ IMAGE_TAG="monitus-jruby-passenger-${DOCKERFILE##*.}"
 if [ "$DOCKERFILE" = "simple" ]; then
     DOCKERFILE="Dockerfile.jruby-passenger-simple"
     IMAGE_TAG="monitus-jruby-passenger-simple"
+elif [ "$DOCKERFILE" = "minimal" ]; then
+    DOCKERFILE="Dockerfile.jruby-minimal"
+    IMAGE_TAG="monitus-jruby-minimal"
 fi
 
 echo "📦 Step 1: Building JRuby + Passenger container..."
@@ -51,12 +54,18 @@ if docker build -f "src/$DOCKERFILE" -t "$IMAGE_TAG" src/; then
     echo "✅ Container built successfully!"
 else
     echo "❌ Container build failed with $DOCKERFILE"
-    if [ "$DOCKERFILE" = "Dockerfile.jruby-passenger" ] && [ "$1" != "simple" ]; then
+    if [ "$DOCKERFILE" = "Dockerfile.jruby-passenger" ] && [ "$1" != "simple" ] && [ "$1" != "minimal" ]; then
         echo ""
         echo "Trying simplified version instead..."
         echo "Running: $0 simple"
         echo "=================================================="
         exec "$0" simple
+    elif [ "$DOCKERFILE" = "Dockerfile.jruby-passenger-simple" ] && [ "$1" != "minimal" ]; then
+        echo ""
+        echo "Trying minimal version instead..."
+        echo "Running: $0 minimal"
+        echo "=================================================="
+        exec "$0" minimal
     fi
     echo "Check the build logs above for details"
     echo "Common issues and fixes:"
@@ -66,6 +75,7 @@ else
     echo "  • If Java installation fails: Check APT repository availability"
     echo ""
     echo "Try the simplified version: $0 simple"
+    echo "Or the minimal version: $0 minimal"
     exit 1
 fi
 

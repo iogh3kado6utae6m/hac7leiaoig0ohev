@@ -1,0 +1,68 @@
+# Minimal JRuby + Passenger setup - maximum reliability
+# Uses working passenger-jruby image and minimal changes
+
+FROM phusion/passenger-jruby94:3.0.4
+LABEL maintainer="Monitus Team"
+
+# Environment variables
+ENV RACK_ENV=production \
+    PASSENGER_APP_ENV=production
+
+# Use bash shell
+SHELL ["/bin/bash", "-c"]
+
+# Create application directory as root, then change ownership
+RUN mkdir -p /home/app/webapp && \
+    chown -R app:app /home/app
+
+# Set working directory
+WORKDIR /home/app/webapp
+
+# Create minimal Gemfile inline to avoid copy issues
+RUN echo 'source "https://rubygems.org"' > Gemfile && \
+    echo 'gem "sinatra"' >> Gemfile && \
+    echo 'gem "nokogiri"' >> Gemfile && \
+    echo 'gem "rake"' >> Gemfile && \
+    chown app:app Gemfile
+
+# Install gems as app user
+USER app
+RUN bundle config set --local path 'vendor/bundle' && \
+    bundle config set --local without 'development test' && \
+    bundle install --jobs=4 --retry=3
+
+# Switch back to root for system configuration
+USER root
+
+# Copy application code
+COPY --chown=app:app prometheus_exporter.rb .
+COPY --chown=app:app config.ru .
+
+# Simple nginx configuration
+RUN echo 'server {' > /etc/nginx/sites-available/webapp.conf && \
+    echo '    listen 80;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '    server_name _;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '    root /home/app/webapp/public;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '    passenger_enabled on;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '    passenger_ruby /usr/bin/jruby;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '}' >> /etc/nginx/sites-available/webapp.conf && \
+    rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
+
+# Enable Nginx service
+RUN rm -f /etc/service/nginx/down
+
+# Create simple health endpoint
+RUN mkdir -p public && \
+    echo 'healthy' > public/health && \
+    chown -R app:app public
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+    CMD curl -f http://localhost/health || exit 1
+
+# Expose port 80
+EXPOSE 80
+
+# Use the standard passenger init system
+CMD ["/sbin/my_init"]

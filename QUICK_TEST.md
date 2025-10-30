@@ -1,18 +1,30 @@
 # Быстрое тестирование JRuby + Passenger
 
-## 🚀 Простой способ (рекомендуется)
+## 🚀 Минимальный способ (рекомендуется)
+
+```bash
+# Тест минимальной версии (очень быстро, 3 минуты)
+./test-fixed-dockerfile.sh minimal
+```
+
+## 🛫 Простой способ
 
 ```bash
 # Тест упрощенной версии (быстро, 5 минут)
 ./test-fixed-dockerfile.sh simple
 ```
 
-**Или вручную:**
+**Ручное тестирование:**
 ```bash
+# Минимальная версия
+docker build -f src/Dockerfile.jruby-minimal -t monitus-jruby-minimal src/
+docker run -p 8080:80 monitus-jruby-minimal
+
+# Упрощенная версия
 docker build -f src/Dockerfile.jruby-passenger-simple -t monitus-jruby-passenger-simple src/
 docker run -p 8080:80 monitus-jruby-passenger-simple
 
-# В другом терминале:
+# Тестирование:
 curl http://localhost:8080/health
 curl http://localhost:8080/monitus/metrics
 ```
