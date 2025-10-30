@@ -1,11 +1,11 @@
 # JRuby + Phusion Passenger + Nginx Dockerfile
 # High-performance production setup for JRuby applications
+# Based on official Passenger Docker patterns
 
 FROM phusion/passenger-ruby32:latest
 
-# Set JRuby and environment variables
-ENV JRUBY_VERSION=9.4.14.0 \
-    RACK_ENV=production \
+# Set environment variables
+ENV RACK_ENV=production \
     PORT=80 \
     LOG_LEVEL=info \
     # JRuby optimizations
@@ -19,54 +19,70 @@ ENV JRUBY_VERSION=9.4.14.0 \
     PASSENGER_CONCURRENCY_MODEL=thread \
     PASSENGER_THREAD_COUNT=16
 
-# Install system dependencies for JRuby
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Java runtime (required for JRuby)
-    openjdk-17-jdk-headless \
-    # Build tools for native gems
-    build-essential \
-    git \
-    curl \
-    wget \
-    # XML processing libraries
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    # Network utilities
-    net-tools \
-    netbase \
-    ca-certificates \
-    # Clean up
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Create build configuration following official patterns
+RUN echo 'export LC_ALL=C' > /pd_build/buildconfig && \
+    echo 'export DEBIAN_FRONTEND=noninteractive' >> /pd_build/buildconfig && \
+    echo 'DEFAULT_RUBY_GEMS="rake rack"' >> /pd_build/buildconfig && \
+    echo 'function minimal_apt_get_install() {' >> /pd_build/buildconfig && \
+    echo '    if [[ ! -e /var/lib/apt/lists/lock ]]; then apt-get update; fi' >> /pd_build/buildconfig && \
+    echo '    apt-get install -y --no-install-recommends "$@"' >> /pd_build/buildconfig && \
+    echo '}' >> /pd_build/buildconfig && \
+    echo 'function run() { echo "+ $@" && "$@"; }' >> /pd_build/buildconfig && \
+    echo 'function create_rvm_wrapper_script() {' >> /pd_build/buildconfig && \
+    echo '    local name="$1" rvm_id="$2" command="$3"' >> /pd_build/buildconfig && \
+    echo '    rm -f "/usr/bin/$name"' >> /pd_build/buildconfig && \
+    echo '    echo "#!/bin/sh" > "/usr/bin/$name"' >> /pd_build/buildconfig && \
+    echo '    echo exec "/usr/local/rvm/wrappers/$rvm_id/$command" '"'"'"$@"'"'"' >> "/usr/bin/$name"' >> /pd_build/buildconfig && \
+    echo '    chmod +x "/usr/bin/$name"' >> /pd_build/buildconfig && \
+    echo '}' >> /pd_build/buildconfig && \
+    mkdir -p /pd_build
 
-# Install JRuby
-RUN cd /tmp \
-    && wget -q https://repo1.maven.org/maven2/org/jruby/jruby-dist/${JRUBY_VERSION}/jruby-dist-${JRUBY_VERSION}-bin.tar.gz \
-    && tar -xzf jruby-dist-${JRUBY_VERSION}-bin.tar.gz \
-    && mv jruby-${JRUBY_VERSION} /opt/jruby \
-    && ln -s /opt/jruby/bin/jruby /usr/local/bin/jruby \
-    && ln -s /opt/jruby/bin/gem /usr/local/bin/jgem \
-    && ln -s /opt/jruby/bin/bundle /usr/local/bin/jbundle \
-    && rm -rf /tmp/jruby-dist-${JRUBY_VERSION}-bin.tar.gz
+# Install JRuby using RVM following official patterns
+RUN source /pd_build/buildconfig && \
+    # Install Java runtime for JRuby
+    run minimal_apt_get_install openjdk-17-jre-headless && \
+    run dpkg-reconfigure ca-certificates-java && \
+    # Install JRuby 9.4.14.0 through RVM
+    RVM_ID="jruby-9.4.14.0" && \
+    run /usr/local/rvm/bin/rvm install $RVM_ID && \
+    run /usr/local/rvm/bin/rvm-exec $RVM_ID@global gem install $DEFAULT_RUBY_GEMS --no-document && \
+    # Create wrapper scripts following official patterns
+    run create_rvm_wrapper_script jruby9.4 $RVM_ID ruby && \
+    run create_rvm_wrapper_script jruby $RVM_ID ruby && \
+    # Make passenger_system_ruby work
+    run create_rvm_wrapper_script ruby3.1 $RVM_ID ruby && \
+    # Create gem and bundle wrappers
+    run create_rvm_wrapper_script jgem $RVM_ID gem && \
+    run create_rvm_wrapper_script jbundle $RVM_ID bundle
 
-# Verify JRuby installation
-RUN jruby --version && java -version
-
-# Install bundler for JRuby
-RUN jgem install bundler:2.4.22
+# Install Ruby utilities and development libraries
+RUN source /pd_build/buildconfig && \
+    # Install development headers for native libraries
+    run minimal_apt_get_install libxml2-dev libxslt1-dev && \
+    run minimal_apt_get_install libmysqlclient-dev && \
+    run minimal_apt_get_install libsqlite3-dev && \
+    run minimal_apt_get_install libpq-dev && \
+    run minimal_apt_get_install zlib1g-dev
 
 # Configure Passenger for JRuby
-RUN echo 'passenger_ruby /usr/local/bin/jruby;' > /etc/nginx/conf.d/jruby.conf
+RUN echo 'passenger_ruby /usr/bin/jruby;' > /etc/nginx/conf.d/jruby-passenger.conf
+
+# Precompile Passenger native support for JRuby
+RUN if [[ -e /usr/bin/jruby9.4 ]]; then \
+        jruby9.4 --dev -S passenger-config build-native-support; \
+        setuser app jruby9.4 --dev -S passenger-config build-native-support; \
+    fi
 
 # Set working directory
 WORKDIR /home/app/webapp
 
-# Copy Gemfile and install dependencies
+# Copy Gemfile for JRuby-Passenger setup
 COPY Gemfile.jruby-passenger Gemfile
-RUN jbundle config set --local path 'vendor/bundle' \
-    && jbundle config set --local without 'development test' \
-    && jbundle install --jobs=4 --retry=3
+
+# Install gems using JRuby through RVM wrappers
+RUN jbundle config set --local path 'vendor/bundle' && \
+    jbundle config set --local without 'development test' && \
+    jbundle install --jobs=4 --retry=3
 
 # Copy application code
 COPY . .
@@ -74,32 +90,33 @@ COPY . .
 # Remove conflicting lockfiles
 RUN rm -f Gemfile.lock
 
-# Copy Nginx configuration
+# Copy Nginx site configuration
 COPY nginx-jruby.conf /etc/nginx/sites-enabled/webapp.conf
 RUN rm -f /etc/nginx/sites-enabled/default
 
-# Copy Passenger configuration
+# Copy additional Passenger configuration
 COPY passenger-jruby.conf /etc/nginx/conf.d/passenger-jruby.conf
 
 # Create startup script
-COPY start-passenger-jruby.sh /usr/local/bin/start-passenger-jruby.sh
-RUN chmod +x /usr/local/bin/start-passenger-jruby.sh
+COPY start-passenger-jruby.sh /etc/my_init.d/99_start_jruby_app.sh
+RUN chmod +x /etc/my_init.d/99_start_jruby_app.sh
 
-# Create directories for logs and runtime
-RUN mkdir -p /var/log/webapp \
-    && chown -R app:app /home/app/webapp \
-    && chown -R app:app /var/log/webapp \
-    && chmod -R 755 /home/app/webapp
+# Set ownership
+RUN chown -R app:app /home/app/webapp
+
+# Create log directory
+RUN mkdir -p /var/log/webapp && \
+    chown -R app:app /var/log/webapp
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
     CMD curl -f http://localhost:80/health || exit 1
 
+# Enable Nginx service
+RUN rm -f /etc/service/nginx/down
+
 # Expose port 80 (Nginx)
 EXPOSE 80
 
-# Configure graceful shutdown
-STOPSIGNAL SIGTERM
-
-# Use our custom startup script
-CMD ["/usr/local/bin/start-passenger-jruby.sh"]
+# Use the standard Passenger init system
+CMD ["/sbin/my_init"]

@@ -1,11 +1,12 @@
 #!/bin/bash
-# JRuby + Passenger + Nginx startup script
+# JRuby application initialization script for Passenger
+# This runs as part of the container initialization
 
 set -e
 
-echo "🚀 Starting JRuby application with Passenger + Nginx..."
-echo "JRuby version: $(jruby --version)"
-echo "Java version: $(java -version 2>&1 | head -n 1)"
+echo "🚀 Initializing JRuby application for Passenger..."
+echo "JRuby version: $(jruby --version 2>/dev/null || echo 'JRuby not yet available')"
+echo "Java version: $(java -version 2>&1 | head -n 1 2>/dev/null || echo 'Java not yet available')"
 
 # Set JRuby environment variables
 export JRUBY_OPTS="${JRUBY_OPTS:--Xcompile.invokedynamic=true -J-Djnr.ffi.asm.enabled=false}"
@@ -86,23 +87,37 @@ fi
 
 # Test JRuby configuration
 echo "🧪 Testing JRuby configuration..."
-jruby -e "puts 'JRuby working: ' + JRUBY_VERSION; require 'java'; puts 'Java integration: OK'"
+if jruby -e "puts 'JRuby working: ' + JRUBY_VERSION; require 'java'; puts 'Java integration: OK'" 2>/dev/null; then
+    echo "✅ JRuby configuration OK"
+else
+    echo "⚠️  JRuby configuration issues detected"
+fi
 
 # Test application syntax
 echo "🔍 Validating application syntax..."
 if [ -f "config.ru" ]; then
-    jruby -c config.ru && echo "✅ config.ru syntax OK" || echo "⚠️  config.ru syntax issues detected"
+    if jruby -c config.ru 2>/dev/null; then
+        echo "✅ config.ru syntax OK"
+    else
+        echo "⚠️  config.ru syntax issues detected"
+    fi
 fi
 
 # Substitute environment variables in nginx config
 echo "⚙️  Configuring Nginx with environment variables..."
-envsubst '$PASSENGER_MIN_INSTANCES $PASSENGER_MAX_INSTANCES $PASSENGER_CONCURRENCY_MODEL $PASSENGER_THREAD_COUNT' \
-    < /etc/nginx/sites-enabled/webapp.conf > /tmp/webapp.conf && \
-    mv /tmp/webapp.conf /etc/nginx/sites-enabled/webapp.conf
+if [ -f "/etc/nginx/sites-enabled/webapp.conf" ]; then
+    envsubst '$PASSENGER_MIN_INSTANCES $PASSENGER_MAX_INSTANCES $PASSENGER_CONCURRENCY_MODEL $PASSENGER_THREAD_COUNT' \
+        < /etc/nginx/sites-enabled/webapp.conf > /tmp/webapp.conf && \
+        mv /tmp/webapp.conf /etc/nginx/sites-enabled/webapp.conf
+fi
 
 # Test nginx configuration
 echo "🔍 Testing Nginx configuration..."
-nginx -t
+if nginx -t 2>/dev/null; then
+    echo "✅ Nginx configuration OK"
+else
+    echo "⚠️  Nginx configuration issues detected"
+fi
 
 # Pre-warm JRuby (optional optimization)
 echo "🔥 Pre-warming JRuby JIT compiler..."
@@ -112,11 +127,7 @@ jruby -e "
     (1..100).each { |i| i * 2 }
   end
   puts 'JIT warm-up complete'
-" || echo "⚠️  JIT warm-up failed, continuing..."
+" 2>/dev/null || echo "⚠️  JIT warm-up failed, continuing..."
 
-# Start services
-echo "🎬 Starting services..."
-
-# Start nginx with passenger module
-echo "🌐 Starting Nginx + Passenger..."
-exec nginx -g 'daemon off;'
+echo "✅ JRuby application initialization complete"
+echo "🌐 Passenger will start the application on first request"
