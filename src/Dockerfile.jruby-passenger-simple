@@ -21,7 +21,10 @@ ENV RACK_ENV=production \
 # Use bash shell
 SHELL ["/bin/bash", "-c"]
 
-# Set working directory
+# Create and set working directory with proper ownership
+RUN mkdir -p /home/app/webapp && \
+    chown -R app:app /home/app/webapp
+
 WORKDIR /home/app/webapp
 
 # Copy Gemfile first for better Docker layer caching
