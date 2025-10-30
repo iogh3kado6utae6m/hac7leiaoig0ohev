@@ -38,13 +38,15 @@ USER root
 COPY --chown=app:app prometheus_exporter.rb .
 COPY --chown=app:app config.ru .
 
-# Simple nginx configuration
+# JRuby-compatible nginx configuration
 RUN echo 'server {' > /etc/nginx/sites-available/webapp.conf && \
     echo '    listen 80;' >> /etc/nginx/sites-available/webapp.conf && \
     echo '    server_name _;' >> /etc/nginx/sites-available/webapp.conf && \
     echo '    root /home/app/webapp/public;' >> /etc/nginx/sites-available/webapp.conf && \
     echo '    passenger_enabled on;' >> /etc/nginx/sites-available/webapp.conf && \
     echo '    passenger_ruby /usr/bin/jruby;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '    passenger_spawn_method direct;' >> /etc/nginx/sites-available/webapp.conf && \
+    echo '    passenger_concurrency_model thread;' >> /etc/nginx/sites-available/webapp.conf && \
     echo '}' >> /etc/nginx/sites-available/webapp.conf && \
     rm -f /etc/nginx/sites-enabled/default && \
     ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
