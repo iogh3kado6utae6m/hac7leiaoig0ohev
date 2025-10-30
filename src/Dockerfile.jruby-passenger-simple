@@ -1,0 +1,72 @@
+# Simplified JRuby + Passenger Dockerfile for testing
+# Uses existing passenger-jruby image as base to avoid RVM complexity
+
+FROM phusion/passenger-jruby94:3.0.4
+LABEL maintainer="Monitus Team"
+
+# Environment variables
+ENV RACK_ENV=production \
+    PORT=80 \
+    LOG_LEVEL=info \
+    # JRuby optimizations
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC" \
+    # Passenger configuration
+    PASSENGER_APP_ENV=production \
+    PASSENGER_MIN_INSTANCES=2 \
+    PASSENGER_MAX_INSTANCES=4 \
+    PASSENGER_CONCURRENCY_MODEL=thread \
+    PASSENGER_THREAD_COUNT=8
+
+# Use bash shell
+SHELL ["/bin/bash", "-c"]
+
+# Set working directory
+WORKDIR /home/app/webapp
+
+# Copy Gemfile first for better Docker layer caching
+COPY --chown=app:app Gemfile.jruby-passenger Gemfile
+
+# Install gems as app user
+USER app
+RUN bundle config set --local path 'vendor/bundle' && \
+    bundle config set --local without 'development test' && \
+    bundle install --jobs=4 --retry=3
+
+# Switch back to root for system configuration
+USER root
+
+# Copy application code
+COPY --chown=app:app . .
+
+# Remove conflicting lockfiles
+RUN rm -f Gemfile.lock
+
+# Copy Nginx configuration
+COPY nginx-jruby.conf /etc/nginx/sites-available/webapp.conf
+RUN rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
+
+# Configure Passenger to use JRuby
+RUN echo 'passenger_ruby /usr/bin/jruby;' > /etc/nginx/conf.d/passenger-jruby.conf
+
+# Copy startup script
+COPY start-passenger-jruby.sh /etc/my_init.d/99_start_jruby_app.sh
+RUN chmod +x /etc/my_init.d/99_start_jruby_app.sh
+
+# Create log directory
+RUN mkdir -p /var/log/webapp && \
+    chown -R app:app /var/log/webapp
+
+# Enable Nginx service
+RUN rm -f /etc/service/nginx/down
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+    CMD curl -f http://localhost/health || exit 1
+
+# Expose port 80
+EXPOSE 80
+
+# Use the standard passenger init system
+CMD ["/sbin/my_init"]

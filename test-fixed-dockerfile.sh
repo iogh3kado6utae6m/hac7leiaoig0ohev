@@ -32,15 +32,31 @@ else
 fi
 echo
 
-# Test 1: Build the fixed container
-echo "📦 Step 1: Building fixed JRuby + Passenger container..."
-echo "This may take 10-15 minutes for the first build"
+# Choose dockerfile based on argument
+DOCKERFILE="${1:-Dockerfile.jruby-passenger}"
+IMAGE_TAG="monitus-jruby-passenger-${DOCKERFILE##*.}"
+
+if [ "$DOCKERFILE" = "simple" ]; then
+    DOCKERFILE="Dockerfile.jruby-passenger-simple"
+    IMAGE_TAG="monitus-jruby-passenger-simple"
+fi
+
+echo "📦 Step 1: Building JRuby + Passenger container..."
+echo "Using: $DOCKERFILE"
+echo "Image tag: $IMAGE_TAG"
+echo "This may take 5-15 minutes depending on approach"
 echo
 
-if docker build -f src/Dockerfile.jruby-passenger -t monitus-jruby-passenger-fixed src/; then
+if docker build -f "src/$DOCKERFILE" -t "$IMAGE_TAG" src/; then
     echo "✅ Container built successfully!"
 else
-    echo "❌ Container build failed"
+    echo "❌ Container build failed with $DOCKERFILE"
+    if [ "$DOCKERFILE" = "Dockerfile.jruby-passenger" ]; then
+        echo ""
+        echo "Trying simplified version instead..."
+        echo "Running: $0 simple"
+        exec "$0" simple
+    fi
     echo "Check the build logs above for details"
     echo "Common issues and fixes:"
     echo "  • If 'user app does not exist': Ensure app user is created properly"
@@ -55,7 +71,7 @@ echo "🚀 Step 2: Testing container startup..."
 
 # Test 2: Start container and basic health check
 echo "Starting container in background..."
-CONTAINER_ID=$(docker run -d -p 8083:80 --name monitus-test-fixed monitus-jruby-passenger-fixed)
+CONTAINER_ID=$(docker run -d -p 8083:80 --name monitus-test-fixed "$IMAGE_TAG")
 
 echo "Container ID: $CONTAINER_ID"
 echo "Waiting for application to start (60 seconds)..."
