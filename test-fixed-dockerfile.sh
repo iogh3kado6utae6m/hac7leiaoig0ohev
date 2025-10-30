@@ -22,6 +22,14 @@ if ! docker info &> /dev/null; then
 fi
 
 echo "✅ Docker is available"
+
+# Check base image availability
+echo "Checking base image availability..."
+if docker pull phusion/baseimage:noble-1.0.2 > /dev/null 2>&1; then
+    echo "✅ Base image is available"
+else
+    echo "⚠️ Warning: Base image pull failed, but may still work if cached"
+fi
 echo
 
 # Test 1: Build the fixed container
@@ -34,6 +42,11 @@ if docker build -f src/Dockerfile.jruby-passenger -t monitus-jruby-passenger-fix
 else
     echo "❌ Container build failed"
     echo "Check the build logs above for details"
+    echo "Common issues and fixes:"
+    echo "  • If 'user app does not exist': Ensure app user is created properly"
+    echo "  • If GPG key issues: Check network connectivity"
+    echo "  • If RVM installation fails: Try building again (network issue)"
+    echo "  • If Java installation fails: Check APT repository availability"
     exit 1
 fi
 

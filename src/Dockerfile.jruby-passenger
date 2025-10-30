@@ -26,7 +26,7 @@ SHELL ["/bin/bash", "-c"]
 # Add build scripts directory (emulating official passenger-docker structure)
 ADD . /pd_build
 
-# Install base system dependencies first
+# Install base system dependencies and create app user
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl wget gnupg2 software-properties-common \
     build-essential git-core ca-certificates \
@@ -34,7 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libyaml-dev libxml2-dev libxslt1-dev \
     libffi-dev libgdbm-dev libncurses5-dev \
     libsqlite3-dev libmysqlclient-dev libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* && \
+    # Create app user and group
+    groupadd -r app && \
+    useradd -r -g app -d /home/app -s /bin/bash -m app
 
 # Install RVM and JRuby following official patterns
 RUN set -e && \
@@ -48,7 +51,7 @@ RUN set -e && \
     echo 'export rvmsudo_secure_path=1' > /etc/profile.d/rvm_secure_path.sh && \
     echo 'export rvm_silence_path_mismatch_check_flag=1' > /etc/profile.d/rvm_silence_path_warning.sh && \
     chmod +x /etc/profile.d/rvm_*.sh && \
-    # Add app user to rvm group (app user already exists in baseimage)
+    # Add app user to rvm group
     usermod -a -G rvm app && \
     # Install system-rvm-exec script
     echo '#!/bin/bash' > /usr/bin/rvm-exec && \
