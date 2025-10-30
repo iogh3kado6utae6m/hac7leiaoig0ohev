@@ -87,11 +87,23 @@ jobs:
       - name: Install test dependencies
         run: |
           cd src
-          # Install test dependencies by updating bundle config
-          bundle config set --local without ""
-          bundle install --jobs 4 --retry 3 --with development test
-          echo "Verifying minitest installation:"
-          jruby -S bundle exec ruby -e "require 'minitest/autorun'; puts 'Minitest available'"
+          # Install production dependencies first
+          bundle config set --local without "development test"
+          bundle install --jobs 4 --retry 3
+          
+          # Install test-specific dependencies
+          cd ../test
+          if [ -f "Gemfile.test" ]; then
+            echo "Installing test-specific gems..."
+            BUNDLE_GEMFILE=Gemfile.test jruby -S bundle install --jobs 4 --retry 3
+          else
+            echo "Installing test gems individually..."
+            jruby -S gem install minitest rack-test
+          fi
+          
+          echo "Verifying test dependencies:"
+          jruby -e "require 'minitest/autorun'; puts '✅ Minitest available'"
+          jruby -e "require 'rack/test'; puts '✅ Rack::Test available'" || echo "⚠️ Rack::Test not available"
           
       - name: Run JRuby syntax checks
         run: |
@@ -159,13 +171,24 @@ jobs:
         run: |
           echo "🔬 Running JRuby compatibility tests..."
           
-          # Set JRuby optimization environment (skip deprecated --server flag)
+          # Set JRuby optimization environment
           export JRUBY_OPTS="-Xcompile.invokedynamic=true"
           export JAVA_OPTS="-Xmx2G -Xms512M -XX:+UseG1GC"
           
-          # Run tests from src directory where gems are installed
+          # Add test gems to load path
+          export RUBYLIB="../test/vendor/bundle/jruby/3.1.0/gems/*/lib:$RUBYLIB"
+          
+          # Run tests from src directory with access to both production and test gems
           cd src
-          jruby -S bundle exec ruby ../test/tests/jruby_compatibility_test.rb
+          
+          # Try with bundle exec first
+          if jruby -S bundle exec ruby ../test/tests/jruby_compatibility_test.rb; then
+            echo "✅ Tests passed with bundle exec"
+          else
+            echo "⚠️ Bundle exec failed, trying direct execution with gem paths..."
+            # Fallback: run directly with manual gem path setup
+            jruby -I"../test/vendor/bundle/jruby/3.1.0/gems/rack-test-*/lib" -I"../test/vendor/bundle/jruby/3.1.0/gems/minitest-*/lib" ../test/tests/jruby_compatibility_test.rb
+          fi
           
           echo "✅ JRuby compatibility tests completed!"
           

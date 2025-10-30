@@ -1,0 +1,14 @@
+# Test-specific gems for CI/CD environments
+# This file contains gems that are only needed for testing
+# and should not be included in production Docker images
+
+source 'https://rubygems.org'
+
+# Test framework
+gem 'minitest'
+
+# HTTP testing
+gem 'rack-test'
+
+# Optional test utilities
+gem 'webmock' # For HTTP request mocking (if needed later)

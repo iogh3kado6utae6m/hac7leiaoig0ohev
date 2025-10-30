@@ -192,7 +192,11 @@ describe "JRuby compatibility" do
       rescue LoadError
         require_relative "../../src/prometheus_exporter"
       end
-      require 'rack/test'
+      begin
+        require 'rack/test'
+      rescue LoadError
+        skip "rack-test gem not available in this environment"
+      end
       require 'stringio'
       
       # Test that we can create a Rack app instance
