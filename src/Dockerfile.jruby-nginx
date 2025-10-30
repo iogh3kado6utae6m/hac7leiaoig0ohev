@@ -1,0 +1,106 @@
+# JRuby + Nginx (без Passenger) - альтернативная версия
+# Использует Nginx как reverse proxy для JRuby + Puma
+
+FROM ubuntu:22.04
+
+# Установка переменных окружения
+ENV DEBIAN_FRONTEND=noninteractive \
+    JRUBY_VERSION=9.4.14.0 \
+    RACK_ENV=production \
+    PORT=8080 \
+    NGINX_PORT=80 \
+    LOG_LEVEL=info \
+    # JRuby оптимизации
+    JRUBY_OPTS="-Xcompile.invokedynamic=true -J-Djnr.ffi.asm.enabled=false" \
+    JAVA_OPTS="-Xmx1G -Xms256M -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Djnr.netdb.provider=files" \
+    MALLOC_ARENA_MAX=2
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Java runtime (для JRuby)
+    openjdk-17-jdk-headless \
+    # Nginx
+    nginx \
+    # Build tools для native gems
+    build-essential \
+    git \
+    curl \
+    wget \
+    # XML processing libraries
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    # Network utilities
+    net-tools \
+    netbase \
+    ca-certificates \
+    # Process management
+    supervisor \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Установка JRuby
+RUN cd /tmp \
+    && wget -q https://repo1.maven.org/maven2/org/jruby/jruby-dist/${JRUBY_VERSION}/jruby-dist-${JRUBY_VERSION}-bin.tar.gz \
+    && tar -xzf jruby-dist-${JRUBY_VERSION}-bin.tar.gz \
+    && mv jruby-${JRUBY_VERSION} /opt/jruby \
+    && ln -s /opt/jruby/bin/jruby /usr/local/bin/jruby \
+    && ln -s /opt/jruby/bin/gem /usr/local/bin/jgem \
+    && ln -s /opt/jruby/bin/bundle /usr/local/bin/jbundle \
+    && rm -rf /tmp/jruby-dist-${JRUBY_VERSION}-bin.tar.gz
+
+# Проверка установки JRuby
+RUN jruby --version && java -version
+
+# Установка bundler для JRuby
+RUN jgem install bundler:2.4.22
+
+# Создание пользователя для приложения
+RUN useradd --create-home --shell /bin/bash app
+
+# Рабочая директория
+WORKDIR /home/app/webapp
+
+# Копирование и установка зависимостей
+COPY Gemfile.jruby Gemfile
+RUN jbundle config set --local deployment true \
+    && jbundle config set --local path 'vendor/bundle' \
+    && jbundle config set --local without 'development test' \
+    && jbundle install --jobs=4 --retry=3
+
+# Копирование кода приложения
+COPY . .
+
+# Удаление конфликтующих lockfiles
+RUN rm -f Gemfile.lock
+
+# Копирование конфигураций Nginx
+COPY nginx-jruby-proxy.conf /etc/nginx/sites-available/webapp
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && ln -s /etc/nginx/sites-available/webapp /etc/nginx/sites-enabled/webapp
+
+# Копирование конфигурации Supervisor
+COPY supervisord-jruby.conf /etc/supervisor/conf.d/jruby-nginx.conf
+
+# Создание директорий для логов
+RUN mkdir -p /var/log/webapp /var/log/supervisor \
+    && chown -R app:app /home/app/webapp \
+    && chown -R app:app /var/log/webapp
+
+# Создание public директории для Nginx
+RUN mkdir -p /home/app/webapp/public \
+    && chown app:app /home/app/webapp/public
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+    CMD curl -f http://localhost:${NGINX_PORT}/health || exit 1
+
+# Expose порты
+EXPOSE 80
+
+# Graceful shutdown
+STOPSIGNAL SIGTERM
+
+# Запуск через supervisor (управляет и Nginx, и JRuby процессами)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf", "-n"]

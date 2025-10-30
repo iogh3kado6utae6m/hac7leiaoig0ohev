@@ -1,7 +1,7 @@
 # JRuby + Phusion Passenger + Nginx Dockerfile
 # High-performance production setup for JRuby applications
 
-FROM phusion/passenger-ruby32:3.0.21
+FROM phusion/passenger-ruby32:latest
 
 # Set JRuby and environment variables
 ENV JRUBY_VERSION=9.4.14.0 \
