@@ -51,10 +51,11 @@ if docker build -f "src/$DOCKERFILE" -t "$IMAGE_TAG" src/; then
     echo "✅ Container built successfully!"
 else
     echo "❌ Container build failed with $DOCKERFILE"
-    if [ "$DOCKERFILE" = "Dockerfile.jruby-passenger" ]; then
+    if [ "$DOCKERFILE" = "Dockerfile.jruby-passenger" ] && [ "$1" != "simple" ]; then
         echo ""
         echo "Trying simplified version instead..."
         echo "Running: $0 simple"
+        echo "=================================================="
         exec "$0" simple
     fi
     echo "Check the build logs above for details"
@@ -63,6 +64,8 @@ else
     echo "  • If GPG key issues: Check network connectivity"
     echo "  • If RVM installation fails: Try building again (network issue)"
     echo "  • If Java installation fails: Check APT repository availability"
+    echo ""
+    echo "Try the simplified version: $0 simple"
     exit 1
 fi
 
