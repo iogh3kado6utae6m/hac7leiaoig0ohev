@@ -49,13 +49,22 @@ RUN echo 'server {' > /etc/nginx/sites-available/webapp.conf && \
     rm -f /etc/nginx/sites-enabled/default && \
     ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
 
-# Enable Nginx service
-RUN rm -f /etc/service/nginx/down
+# Create simple startup script for diagnostics
+RUN echo '#!/bin/bash' > /etc/my_init.d/99_jruby_minimal.sh && \
+    echo 'echo "[$(date)] Minimal JRuby setup - Passenger should start automatically"' >> /etc/my_init.d/99_jruby_minimal.sh && \
+    echo 'echo "[$(date)] JRuby version: $(jruby --version)"' >> /etc/my_init.d/99_jruby_minimal.sh && \
+    echo 'echo "[$(date)] Application files: $(ls -la /home/app/webapp)"' >> /etc/my_init.d/99_jruby_minimal.sh && \
+    echo 'nginx -t && echo "[$(date)] Nginx config OK"' >> /etc/my_init.d/99_jruby_minimal.sh && \
+    chmod +x /etc/my_init.d/99_jruby_minimal.sh && \
+    # Enable Nginx service
+    rm -f /etc/service/nginx/down
 
-# Create simple health endpoint
+# Create simple health endpoint and basic config.ru
 RUN mkdir -p public && \
     echo 'healthy' > public/health && \
-    chown -R app:app public
+    echo 'require_relative "prometheus_exporter"' > config.ru && \
+    echo 'run PrometheusExporterApp' >> config.ru && \
+    chown -R app:app public config.ru
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
