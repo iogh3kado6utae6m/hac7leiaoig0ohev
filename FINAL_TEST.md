@@ -38,15 +38,18 @@ because it does not support Kernel.fork
 
 1. **Добавлено во все nginx конфигурации:**
    ```nginx
-   passenger_spawn_method direct;
-   passenger_concurrency_model thread;
-   passenger_thread_count 8;
+   passenger_spawn_method direct;        # Критично для JRuby
+   passenger_min_instances 1;            # Open source совместимо
+   passenger_max_pool_size 4;            # Вместо passenger_max_instances
+   # Убраны Enterprise-only директивы:
+   # passenger_concurrency_model thread;  # Только в Enterprise!
+   # passenger_thread_count 8;            # Только в Enterprise!
    ```
 
-2. **Обновлены файлы:**
-   - `src/Dockerfile.jruby-test`
-   - `src/nginx-jruby.conf` 
-   - `src/Dockerfile.jruby-minimal`
+2. **Обновлены файлы (коммиты ed19119, 43de376):**
+   - `src/Dockerfile.jruby-test` - исправлен open source конфиг
+   - `src/nginx-jruby.conf` - убраны Enterprise директивы
+   - `src/Dockerfile.jruby-minimal` - упрощеная конфигурация
 
 3. **JRuby-оптимизация:**
    - Direct spawning (без fork)
