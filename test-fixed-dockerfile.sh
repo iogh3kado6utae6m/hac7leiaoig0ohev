@@ -45,6 +45,9 @@ elif [ "$DOCKERFILE" = "minimal" ]; then
 elif [ "$DOCKERFILE" = "test" ]; then
     DOCKERFILE="Dockerfile.jruby-test"
     IMAGE_TAG="monitus-jruby-test"
+elif [ "$DOCKERFILE" = "official" ]; then
+    DOCKERFILE="Dockerfile.jruby-official-pattern"
+    IMAGE_TAG="monitus-jruby-official"
 fi
 
 echo "📦 Step 1: Building JRuby + Passenger container..."
@@ -99,8 +102,15 @@ CONTAINER_ID=$(docker run -d -p 8083:80 --name monitus-test-fixed "$IMAGE_TAG")
 echo "Container ID: $CONTAINER_ID"
 echo "Waiting for application to start (60 seconds)..."
 
-# Wait for container to be ready
-sleep 60
+# Wait for container to be ready, but check earlier
+sleep 15
+echo "Making early test request..."
+if curl -f -s --connect-timeout 2 http://localhost:8083/health; then
+    echo "✅ Early health check passed!"
+else
+    echo "⚠️  Early health check failed, waiting longer..."
+    sleep 45
+fi
 
 # Test 3: Health checks
 echo
