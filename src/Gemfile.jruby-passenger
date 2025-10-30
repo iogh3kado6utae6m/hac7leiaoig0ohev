@@ -1,43 +1,43 @@
+# Gemfile for JRuby + Passenger production deployment
+# Optimized for production use with minimal dependencies
+
 source 'https://rubygems.org'
 
-# JRuby + Passenger optimized gem configuration
-# Core web framework dependencies
-gem 'nokogiri'           # JRuby uses Java XML processing
-gem 'sinatra', '~> 3.0'  # Latest Sinatra with JRuby support  
-gem 'rack', '~> 2.2'     # Stable rack version
-gem 'rackup'             # Required for modern Rack
+# Ruby version specification
+ruby '3.1.0', :engine => 'jruby', :engine_version => '9.4.14.0'
 
-# Passenger (application server)
-gem 'passenger'          # Phusion Passenger for production
+# Core web framework
+gem 'sinatra', '~> 3.0'
+gem 'rack', '~> 2.2'
 
-# Metrics (core requirement)
-gem 'prometheus-client'  # Prometheus metrics
+# XML parsing for passenger-status
+gem 'nokogiri', '~> 1.15'
 
-# Concurrency and utilities
-gem 'concurrent-ruby'    # Leverages JVM threading
+# JSON parsing optimized for JRuby
+gem 'jrjackson', '~> 0.4.17'
+
+# HTTP client for health checks
+gem 'net-http'
+
+# Passenger gem for integration
+gem 'passenger', '~> 6.0'
+
+# Production web server (backup option)
+gem 'puma', '~> 6.0'
+
+# Logging
 gem 'logger'
-gem 'ipaddr'
-gem 'json'
 
-# Optional dependencies for full app features
-gem 'faye-websocket'     # WebSocket support
-gem 'maxminddb'          # GeoIP features
+# Environment management
+gem 'dotenv'
 
-# System monitoring gems (optional)
-begin
-  gem 'sys-cpu', platforms: [:ruby, :jruby]
-  gem 'sys-filesystem', platforms: [:ruby, :jruby]
-rescue LoadError
-  # Skip if not available on this platform
+group :production do
+  # Production-specific gems
+  gem 'lograge' # Structured logging
 end
 
-# JRuby-specific optimizations (only install on JRuby platform)
-gem 'jruby-openssl', platforms: :jruby   # Enhanced SSL performance
-gem 'jrjackson', platforms: :jruby       # Fast JSON parsing
-
-# Testing dependencies (needed for CI tests)
-gem 'minitest'   # Test framework
-
-# Development and testing dependencies
-# Note: rack-test removed as it causes bundler resolution issues
-# when test group is excluded in Docker builds
+group :development, :test do
+  # Development tools (excluded in production via bundle config)
+  gem 'rake'
+  gem 'rspec'
+end

@@ -1,100 +1,82 @@
-# JRuby + Passenger optimized config.ru
-# Optimized for production deployment with Phusion Passenger
+#!/usr/bin/env jruby
+# config.ru for JRuby + Passenger production deployment
+# Optimized for JRuby threading model
 
-require "bundler/setup"
+require 'bundler/setup'
 
-# JRuby + Passenger optimizations
-if defined?(JRUBY_VERSION)
-  puts "Loading JRuby #{JRUBY_VERSION} application for Passenger"
+# Configure JRuby-specific optimizations
+if RUBY_ENGINE == 'jruby'
+  # Enable ObjectSpace for better memory management
+  require 'jruby'
+  JRuby.objectspace = true
   
-  # JRuby system properties are better set via environment variables
-  # but we can still set some programmatically if needed
-  begin
-    require 'java'
-    
-    # Set JRuby optimizations if not already set
-    unless ENV['JRUBY_OPTS']&.include?('invokedynamic')
-      Java::JavaLang::System.setProperty('jruby.compile.invokedynamic', 'true')
-    end
-    
-    # Enable JRuby thread pool for better Passenger integration
-    Java::JavaLang::System.setProperty('jruby.thread.pool.enabled', 'true')
-    
-    puts "JRuby optimizations applied for Passenger"
-    
-    # Log memory status
-    runtime = Java::JavaLang::Runtime.getRuntime
-    total_mb = runtime.totalMemory / 1024 / 1024
-    free_mb = runtime.freeMemory / 1024 / 1024
-    puts "JRuby memory: #{total_mb - free_mb}MB used / #{total_mb}MB total"
-    
-  rescue => e
-    puts "Warning: Could not set JRuby optimizations: #{e.message}"
-  end
+  # Set thread pool for better concurrency
+  java_import 'java.util.concurrent.ForkJoinPool'
   
-  # Use faster JSON library for JRuby if available
-  begin
-    require 'jrjackson'
-    # Replace standard JSON with JrJackson for better performance
-    JSON = JrJackson::Json
-    puts "Using JrJackson for optimized JSON performance"
-  rescue LoadError
-    # Fall back to standard JSON if JrJackson is not available
-    require 'json'
-    puts "Using standard JSON library"
-  end
-else
-  require 'json'
-  puts "Running on MRI Ruby #{RUBY_VERSION}"
+  # Enable JRuby optimizations
+  $VERBOSE = nil # Reduce JRuby startup warnings in production
 end
 
-# Determine which application to load based on available files
-app_to_load = nil
-app_name = nil
+# Set environment
+ENV['RACK_ENV'] ||= 'production'
 
-# Try to load applications in order of preference
-applications = [
-  { file: "prometheus_exporter", class: "PrometheusExporterApp", name: "Prometheus Exporter" },
-  { file: "victima", class: "TargetApp", name: "Victima Test Server" }
-]
-
-applications.each do |app_config|
-  begin
-    require_relative app_config[:file]
-    app_class = Object.const_get(app_config[:class])
-    app_to_load = app_class
-    app_name = app_config[:name]
-    puts "Loaded #{app_name} (#{app_class.name})"
-    break
-  rescue LoadError => e
-    puts "Could not load #{app_config[:name]}: #{e.message}"
-  rescue NameError => e
-    puts "Class #{app_config[:class]} not found in #{app_config[:file]}: #{e.message}"
+# Configure logging for production
+if ENV['RACK_ENV'] == 'production'
+  # Use structured logging
+  require 'logger'
+  logger = Logger.new($stdout)
+  logger.level = Logger.const_get((ENV['LOG_LEVEL'] || 'INFO').upcase)
+  logger.formatter = proc do |severity, datetime, progname, msg|
+    {
+      timestamp: datetime.utc.iso8601,
+      level: severity,
+      pid: Process.pid,
+      message: msg
+    }.to_json + "\n"
   end
 end
 
-# Passenger-optimized middleware stack
-if app_to_load
-  puts "Configuring #{app_name} for Passenger deployment"
+# Load application
+require_relative 'prometheus_exporter'
+
+# Configure Sinatra for production
+PrometheusExporterApp.configure :production do
+  set :logging, false # We handle logging ourselves
+  set :dump_errors, false
+  set :show_exceptions, false
+  set :raise_errors, false
   
-  # Add request ID middleware for tracking
-  class RequestIdMiddleware
-    def initialize(app)
-      @app = app
-    end
-    
-    def call(env)
-      env['HTTP_X_REQUEST_ID'] ||= SecureRandom.hex(8)
-      status, headers, body = @app.call(env)
-      headers['X-Request-ID'] = env['HTTP_X_REQUEST_ID']
-      [status, headers, body]
-    end
+  # Enable static file serving with proper headers
+  set :public_folder, File.dirname(__FILE__) + '/public'
+  set :static_cache_control, [:public, :max_age => 31536000] # 1 year for static assets
+end
+
+# Middleware stack optimized for JRuby
+use Rack::Deflater
+use Rack::ConditionalGet
+use Rack::ETag
+
+# Health check middleware
+use(Class.new do
+  def initialize(app)
+    @app = app
   end
   
-  # Add performance monitoring middleware
-  class PerformanceMiddleware
+  def call(env)
+    if env['PATH_INFO'] == '/health'
+      [200, {'Content-Type' => 'text/plain'}, ['healthy']]
+    else
+      @app.call(env)
+    end
+  end
+end)
+
+# Request logging middleware for production
+if ENV['RACK_ENV'] == 'production'
+  use(Class.new do
     def initialize(app)
       @app = app
+      @logger = Logger.new($stdout)
     end
     
     def call(env)
@@ -102,78 +84,19 @@ if app_to_load
       status, headers, body = @app.call(env)
       duration = Time.now - start_time
       
-      # Log slow requests (> 1 second)
-      if duration > 1.0 && env['PATH_INFO'] != '/health'
-        puts "SLOW REQUEST: #{env['REQUEST_METHOD']} #{env['PATH_INFO']} took #{duration.round(3)}s"
-      end
-      
-      # Add performance headers for debugging
-      headers['X-Response-Time'] = "#{(duration * 1000).round(2)}ms"
+      @logger.info({
+        method: env['REQUEST_METHOD'],
+        path: env['PATH_INFO'],
+        status: status,
+        duration_ms: (duration * 1000).round(2),
+        user_agent: env['HTTP_USER_AGENT'],
+        remote_addr: env['REMOTE_ADDR']
+      }.to_json)
       
       [status, headers, body]
     end
-  end
-  
-  # Add health check middleware (bypass app for faster response)
-  class HealthCheckMiddleware
-    def initialize(app)
-      @app = app
-    end
-    
-    def call(env)
-      if env['PATH_INFO'] == '/nginx-health'
-        # Super fast health check for nginx
-        [200, {'Content-Type' => 'text/plain'}, ['Nginx + Passenger OK']]
-      elsif env['PATH_INFO'] == '/health'
-        # App health check with JRuby info
-        jruby_info = defined?(JRUBY_VERSION) ? " - JRuby #{JRUBY_VERSION}" : ""
-        [200, {'Content-Type' => 'text/plain'}, ["OK#{jruby_info}\n"]]
-      else
-        @app.call(env)
-      end
-    end
-  end
-  
-  # Configure middleware stack
-  use RequestIdMiddleware
-  use PerformanceMiddleware
-  use HealthCheckMiddleware
-  
-  # Add request logging for production
-  use Rack::CommonLogger, $stdout unless ENV['DISABLE_REQUEST_LOGGING']
-  
-  puts "Starting #{app_name} with Passenger + Nginx"
-  run app_to_load
-  
-else
-  # Ultimate fallback - simple health check app
-  puts "No main application found, using minimal health check app"
-  
-  class MinimalPassengerApp
-    def call(env)
-      case env['PATH_INFO']
-      when '/health', '/nginx-health'
-        jruby_info = defined?(JRUBY_VERSION) ? " - JRuby #{JRUBY_VERSION}" : ""
-        [200, {'Content-Type' => 'text/plain'}, ["Passenger Health Check OK#{jruby_info}\n"]]
-      when '/'
-        [200, {'Content-Type' => 'text/plain'}, ["JRuby + Passenger Server Running\nVisit /health for health check\n"]]
-      when '/info'
-        info = {
-          server: "JRuby + Passenger + Nginx",
-          jruby_version: defined?(JRUBY_VERSION) ? JRUBY_VERSION : "N/A",
-          ruby_version: RUBY_VERSION,
-          rack_env: ENV['RACK_ENV'] || 'development',
-          passenger_env: ENV['PASSENGER_APP_ENV'] || 'unknown',
-          timestamp: Time.now.utc.iso8601
-        }
-        [200, {'Content-Type' => 'application/json'}, [info.to_json + "\n"]]
-      else
-        [404, {'Content-Type' => 'text/plain'}, ['Not Found']]
-      end
-    end
-  end
-  
-  run MinimalPassengerApp.new
+  end)
 end
 
-puts "JRuby + Passenger application configuration complete"
+# Main application
+run PrometheusExporterApp
