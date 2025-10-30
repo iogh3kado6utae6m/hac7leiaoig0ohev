@@ -3,7 +3,7 @@
 # Based on phusion/baseimage with custom JRuby installation
 
 FROM phusion/baseimage:noble-1.0.2
-MAINTAINER "Monitus Team"
+LABEL maintainer="Monitus Team"
 
 # Environment variables for JRuby optimization
 ENV RACK_ENV=production \
@@ -20,95 +20,35 @@ ENV RACK_ENV=production \
     PASSENGER_CONCURRENCY_MODEL=thread \
     PASSENGER_THREAD_COUNT=16
 
+# Use bash as shell for RVM compatibility
+SHELL ["/bin/bash", "-c"]
+
 # Add build scripts directory (emulating official passenger-docker structure)
 ADD . /pd_build
 
-# Create buildconfig following official patterns
-RUN echo 'export LC_ALL=C' > /pd_build/buildconfig && \
-    echo 'export DEBIAN_FRONTEND=noninteractive' >> /pd_build/buildconfig && \
-    echo 'DEFAULT_RUBY_GEMS="rake rack"' >> /pd_build/buildconfig && \
-    # Copy essential functions from official buildconfig
-    cat >> /pd_build/buildconfig << 'EOF'
+# Install base system dependencies first
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl wget gnupg2 software-properties-common \
+    build-essential git-core ca-certificates \
+    libssl-dev libreadline-dev zlib1g-dev \
+    libyaml-dev libxml2-dev libxslt1-dev \
+    libffi-dev libgdbm-dev libncurses5-dev \
+    libsqlite3-dev libmysqlclient-dev libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-if perl -v >/dev/null 2>/dev/null; then
-	RESET=`perl -e 'print("\e[0m")'`
-	BOLD=`perl -e 'print("\e[1m")'`
-	YELLOW=`perl -e 'print("\e[33m")'`
-	BLUE_BG=`perl -e 'print("\e[44m")'`
-else
-	RESET=
-	BOLD=
-	YELLOW=
-	BLUE_BG=
-fi
-
-function minimal_apt_get_install()
-{
-	if [[ ! -e /var/lib/apt/lists/lock ]]; then
-		apt-get update
-	fi
-	apt-get install -y --no-install-recommends "$@"
-}
-
-function cleanup_apt()
-{
-	apt-get -y clean
-	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/log/dpkg.log /var/log/apt/*
-}
-
-function header()
-{
-	local title="$1"
-	echo "${BLUE_BG}${YELLOW}${BOLD}${title}${RESET}"
-	echo "------------------------------------------"
-}
-
-function run()
-{
-	echo "+ $@"
-	"$@"
-}
-
-function create_rvm_wrapper_script()
-{
-	local name="$1"
-	local rvm_id="$2"
-	local command="$3"
-
-        rm -f "/usr/bin/$name"
-
-	echo "+ Creating /usr/bin/$name"
-	echo '#!/bin/sh' >> "/usr/bin/$name"
-	echo exec "/usr/local/rvm/wrappers/$rvm_id/$command" '"$@"' >> "/usr/bin/$name"
-	chmod +x "/usr/bin/$name"
-}
-EOF
-
-# Install base system following official patterns
-RUN source /pd_build/buildconfig && \
-    # Enable Ubuntu repositories
-    run apt-get update && \
-    run apt-get install -y --no-install-recommends \
-        curl wget gnupg2 software-properties-common && \
-    # Install essential build tools
-    run apt-get install -y --no-install-recommends \
-        build-essential git-core \
-        libssl-dev libreadline-dev zlib1g-dev \
-        libyaml-dev libxml2-dev libxslt1-dev \
-        libffi-dev libgdbm-dev libncurses5-dev \
-        libsqlite3-dev libmysqlclient-dev libpq-dev && \
-    # Install RVM
-    run gpg --keyserver hkp://pool.sks-keyservers.net --recv-keys \
+# Install RVM and JRuby following official patterns
+RUN set -e && \
+    # Import RVM GPG keys
+    gpg --keyserver hkp://keyserver.ubuntu.com --recv-keys \
         409B6B1796C275462A1703113804BB82D39DC0E3 \
         7D2BAF1CF37B13E2069D6956105BD0E739499BDB && \
-    run curl -sSL https://get.rvm.io | bash -s stable && \
+    # Install RVM
+    curl -sSL https://get.rvm.io | bash -s stable && \
     # Configure RVM environment 
     echo 'export rvmsudo_secure_path=1' > /etc/profile.d/rvm_secure_path.sh && \
     echo 'export rvm_silence_path_mismatch_check_flag=1' > /etc/profile.d/rvm_silence_path_warning.sh && \
     chmod +x /etc/profile.d/rvm_*.sh && \
-    # Add app user to rvm group
-    groupadd -r app || true && \
-    useradd -r -g app -d /home/app -s /bin/bash app || true && \
+    # Add app user to rvm group (app user already exists in baseimage)
     usermod -a -G rvm app && \
     # Install system-rvm-exec script
     echo '#!/bin/bash' > /usr/bin/rvm-exec && \
@@ -117,74 +57,67 @@ RUN source /pd_build/buildconfig && \
     # Ensure bash loads RVM environment
     echo 'if [[ "$rvm_prefix" = "" ]]; then for file in /etc/profile.d/*rvm*; do source $file; done; fi' >> /etc/bash.bashrc
 
-# Install JRuby following official passenger-docker patterns
-RUN source /pd_build/buildconfig && \
-    source /usr/local/rvm/scripts/rvm && \
-    # Install Java 17 (as in official jruby-9.4.12.0.sh)
-    run minimal_apt_get_install openjdk-17-jre-headless && \
-    run dpkg-reconfigure ca-certificates-java && \
-    # Install JRuby 9.4.14.0
-    header "Installing jruby-9.4.14.0" && \
-    RVM_ID="jruby-9.4.14.0" && \
-    run /usr/local/rvm/bin/rvm install $RVM_ID && \
-    run /usr/local/rvm/bin/rvm-exec $RVM_ID@global gem install $DEFAULT_RUBY_GEMS --no-document && \
-    # Create wrapper scripts (following official patterns)
-    run create_rvm_wrapper_script jruby9.4 $RVM_ID ruby && \
-    run create_rvm_wrapper_script jruby $RVM_ID ruby && \
-    run create_rvm_wrapper_script ruby3.1 $RVM_ID ruby && \
-    run create_rvm_wrapper_script ruby $RVM_ID ruby && \
-    run create_rvm_wrapper_script gem $RVM_ID gem && \
-    run create_rvm_wrapper_script rake $RVM_ID rake && \
-    run create_rvm_wrapper_script bundle $RVM_ID bundle && \
-    run create_rvm_wrapper_script bundler $RVM_ID bundler && \
-    # Set JRuby as default
-    run bash -lc "rvm use $RVM_ID --default"
+# Install Java 17 for JRuby
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless && \
+    dpkg-reconfigure -f noninteractive ca-certificates-java && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Nginx + Passenger following official patterns
-RUN source /pd_build/buildconfig && \
-    header "Installing Phusion Passenger..." && \
+# Install JRuby following official passenger-docker patterns
+RUN set -e && \
+    source /usr/local/rvm/scripts/rvm && \
+    # Install JRuby 9.4.14.0
+    echo "Installing JRuby 9.4.14.0..." && \
+    RVM_ID="jruby-9.4.14.0" && \
+    /usr/local/rvm/bin/rvm install $RVM_ID && \
+    /usr/local/rvm/bin/rvm-exec $RVM_ID@global gem install rake rack --no-document && \
+    # Create wrapper scripts following official patterns
+    echo '#!/bin/sh' > /usr/bin/jruby9.4 && \
+    echo 'exec /usr/local/rvm/wrappers/jruby-9.4.14.0/ruby "$@"' >> /usr/bin/jruby9.4 && \
+    chmod +x /usr/bin/jruby9.4 && \
+    echo '#!/bin/sh' > /usr/bin/jruby && \
+    echo 'exec /usr/local/rvm/wrappers/jruby-9.4.14.0/ruby "$@"' >> /usr/bin/jruby && \
+    chmod +x /usr/bin/jruby && \
+    echo '#!/bin/sh' > /usr/bin/ruby && \
+    echo 'exec /usr/local/rvm/wrappers/jruby-9.4.14.0/ruby "$@"' >> /usr/bin/ruby && \
+    chmod +x /usr/bin/ruby && \
+    echo '#!/bin/sh' > /usr/bin/gem && \
+    echo 'exec /usr/local/rvm/wrappers/jruby-9.4.14.0/gem "$@"' >> /usr/bin/gem && \
+    chmod +x /usr/bin/gem && \
+    echo '#!/bin/sh' > /usr/bin/bundle && \
+    echo 'exec /usr/local/rvm/wrappers/jruby-9.4.14.0/bundle "$@"' >> /usr/bin/bundle && \
+    chmod +x /usr/bin/bundle && \
+    # Set JRuby as default
+    bash -lc "rvm use $RVM_ID --default"
+
+# Install Nginx + Passenger
+RUN set -e && \
     # Install Phusion Passenger
-    run apt-get install -y nginx passenger libnginx-mod-http-passenger && \
-    # Configure Nginx
-    run mkdir -p /etc/nginx/main.d && \
-    # Enable Nginx + Passenger module
-    echo 'include /etc/nginx/modules-enabled/*.conf;' > /etc/nginx/nginx.conf.head && \
-    cat /etc/nginx/nginx.conf >> /etc/nginx/nginx.conf.head && \
-    mv /etc/nginx/nginx.conf.head /etc/nginx/nginx.conf && \
-    # Install Nginx runit service
-    run mkdir -p /etc/service/nginx && \
-    echo '#!/bin/sh' > /etc/service/nginx/run && \
-    echo 'exec /usr/sbin/nginx -g "daemon off;"' >> /etc/service/nginx/run && \
-    chmod +x /etc/service/nginx/run && \
-    # Use SIGQUIT for nginx shutdown
-    run mkdir -p /etc/service/nginx/control/ && \
-    echo '#!/bin/sh' > /etc/service/nginx/control/t && \
-    echo 'kill -QUIT `cat /run/nginx.pid`' >> /etc/service/nginx/control/t && \
-    chmod +x /etc/service/nginx/control/t && \
-    # Configure logrotate
-    run sed -i 's|invoke-rc.d nginx rotate|sv 1 nginx|' /etc/logrotate.d/nginx && \
-    run sed -i -e '/sv 1 nginx.*/a\' -e '\t\tpassenger-config reopen-logs >/dev/null 2>&1' /etc/logrotate.d/nginx && \
-    run rm -f /var/log/nginx/error.log
+    apt-get update && \
+    apt-get install -y nginx passenger libnginx-mod-http-passenger && \
+    # Configure Nginx to load Passenger module
+    sed -i '/include \/etc\/nginx\/modules-enabled\/\*.conf;/i include /usr/share/nginx/modules-available/mod-http-passenger.load;' /etc/nginx/nginx.conf && \
+    rm -rf /var/lib/apt/lists/*
 
 # Precompile Passenger native support for JRuby
-RUN if [[ -e /usr/bin/jruby9.4 ]]; then \
-        jruby9.4 --dev -S passenger-config build-native-support; \
-        su - app -c "jruby9.4 --dev -S passenger-config build-native-support"; \
-    fi
+RUN set -e && \
+    source /usr/local/rvm/scripts/rvm && \
+    rvm use jruby-9.4.14.0 && \
+    jruby --dev -S passenger-config build-native-support && \
+    su - app -c "source /usr/local/rvm/scripts/rvm && rvm use jruby-9.4.14.0 && jruby --dev -S passenger-config build-native-support" || true
 
-# Create application directory
+# Create application directory and set ownership
 RUN mkdir -p /home/app/webapp && \
     chown -R app:app /home/app
 
 # Set working directory
 WORKDIR /home/app/webapp
 
-# Copy Gemfile for production
-COPY Gemfile.jruby-passenger Gemfile
-
-# Install gems as app user (avoid bundler deployment issues)
+# Copy and install gems as app user
+COPY --chown=app:app Gemfile.jruby-passenger Gemfile
 USER app
-RUN source /usr/local/rvm/scripts/rvm && \
+RUN set -e && \
+    source /usr/local/rvm/scripts/rvm && \
     rvm use jruby-9.4.14.0 && \
     bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
@@ -207,6 +140,17 @@ COPY nginx-jruby.conf /etc/nginx/sites-available/webapp.conf
 RUN rm -f /etc/nginx/sites-enabled/default && \
     ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
 
+# Install Nginx runit service (following official patterns)
+RUN mkdir -p /etc/service/nginx && \
+    echo '#!/bin/sh' > /etc/service/nginx/run && \
+    echo 'exec /usr/sbin/nginx -g "daemon off;"' >> /etc/service/nginx/run && \
+    chmod +x /etc/service/nginx/run && \
+    # Use SIGQUIT for nginx shutdown
+    mkdir -p /etc/service/nginx/control/ && \
+    echo '#!/bin/sh' > /etc/service/nginx/control/t && \
+    echo 'kill -QUIT `cat /run/nginx.pid`' >> /etc/service/nginx/control/t && \
+    chmod +x /etc/service/nginx/control/t
+
 # Copy startup script
 COPY start-passenger-jruby.sh /etc/my_init.d/99_start_jruby_app.sh
 RUN chmod +x /etc/my_init.d/99_start_jruby_app.sh
@@ -215,14 +159,9 @@ RUN chmod +x /etc/my_init.d/99_start_jruby_app.sh
 RUN mkdir -p /var/log/webapp && \
     chown -R app:app /var/log/webapp
 
-# Final cleanup following official patterns
-RUN source /pd_build/buildconfig && \
-    cleanup_apt && \
-    rm -rf /pd_build
-
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
-    CMD curl -f http://localhost/monitus/metrics || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
+    CMD curl -f http://localhost/health || exit 1
 
 # Expose port 80 (Nginx)
 EXPOSE 80
