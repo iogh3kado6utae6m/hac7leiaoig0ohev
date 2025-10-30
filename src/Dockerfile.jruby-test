@@ -67,7 +67,7 @@ RUN echo 'require_relative "app"' > config.ru && \
     echo 'run TestApp' >> config.ru && \
     chown -R app:app .
 
-# JRuby-compatible nginx config with direct spawning
+# JRuby-compatible nginx config with direct spawning (open source compatible)
 RUN cat > /etc/nginx/sites-available/webapp.conf << 'EOF'
 server {
     listen 80;
@@ -82,11 +82,9 @@ server {
     # Critical: JRuby doesn't support fork(), use direct spawning
     passenger_spawn_method direct;
     
-    # JRuby threading optimization
-    passenger_concurrency_model thread;
-    passenger_thread_count 8;
+    # Basic Passenger configuration (open source compatible)
     passenger_min_instances 1;
-    passenger_max_instances 4;
+    passenger_max_pool_size 4;
     
     location / {
         try_files $uri @app;
