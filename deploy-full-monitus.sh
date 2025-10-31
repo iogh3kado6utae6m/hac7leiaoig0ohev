@@ -4,7 +4,7 @@
 set -euo pipefail
 
 DOCKER_VARIANT="${1:-minimal}"
-CONTAINER_NAME="monitus"
+CONTAINER_NAME="${3:-monitus}"
 PORT="${2:-8080}"
 
 echo "🚀 Deploying full Monitus application..."
@@ -50,13 +50,34 @@ done
 # Test endpoints
 echo "\n🔍 Testing endpoints:"
 echo "Health: http://localhost:$PORT/health"
-curl -s "http://localhost:$PORT/health" || echo "❌ Health endpoint failed"
+HEALTH_RESPONSE=$(curl -s "http://localhost:$PORT/health" 2>/dev/null || echo "CONNECTION_FAILED")
+if [[ "$HEALTH_RESPONSE" == "healthy" ]]; then
+    echo "✅ Health endpoint working!"
+else
+    echo "❌ Health endpoint failed!"
+    echo "   Response: ${HEALTH_RESPONSE:0:200}..."
+    echo "\n🔧 Troubleshooting steps:"
+    echo "   1. Check container logs: docker logs $CONTAINER_NAME"
+    echo "   2. Debug deployment: ./debug-deployment.sh $CONTAINER_NAME"
+    echo "   3. Try debug variant: ./deploy-full-monitus.sh minimal-debug $PORT"
+    exit 1
+fi
 
 echo "\nMetrics: http://localhost:$PORT/monitus/metrics"
-curl -s "http://localhost:$PORT/monitus/metrics" | head -5 || echo "❌ Metrics endpoint failed"
+METRICS_RESPONSE=$(curl -s "http://localhost:$PORT/monitus/metrics" 2>/dev/null | head -5 || echo "FAILED")
+if [[ "$METRICS_RESPONSE" =~ "# HELP".*"# TYPE" ]]; then
+    echo "✅ Metrics endpoint working!"
+else
+    echo "❌ Metrics endpoint failed (but container is healthy)"
+fi
 
 echo "\nPassenger Status: http://localhost:$PORT/monitus/passenger-status"
-curl -s "http://localhost:$PORT/monitus/passenger-status" | head -5 || echo "❌ Passenger status endpoint failed"
+PASSENGER_RESPONSE=$(curl -s "http://localhost:$PORT/monitus/passenger-status" 2>/dev/null | head -5 || echo "FAILED")
+if [[ "$PASSENGER_RESPONSE" =~ "Version".*"General information" ]]; then
+    echo "✅ Passenger status endpoint working!"
+else
+    echo "❌ Passenger status endpoint failed (but container is healthy)"
+fi
 
 echo "\n🎉 Deployment complete!"
 echo "\n📋 Available endpoints:"

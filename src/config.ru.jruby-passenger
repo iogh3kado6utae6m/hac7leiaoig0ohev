@@ -3,6 +3,7 @@
 # Optimized for JRuby threading model
 
 require 'bundler/setup'
+require 'json'
 
 # Configure JRuby-specific optimizations
 if RUBY_ENGINE == 'jruby'

@@ -1,0 +1,105 @@
+# JRuby + Passenger Minimal Debug Dockerfile
+# Simplified for troubleshooting startup issues
+
+FROM phusion/passenger-jruby94:3.0.4
+LABEL maintainer="Monitus Team"
+
+# Environment variables for debugging
+ENV RACK_ENV=production \
+    PASSENGER_APP_ENV=production \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx512M -Xms128M -XX:+UseG1GC" \
+    LOG_LEVEL=debug \
+    PASSENGER_LOG_LEVEL=3
+
+# Create application directories
+RUN mkdir -p /home/app/webapp/public && \
+    chown -R app:app /home/app
+
+WORKDIR /home/app/webapp
+
+# Copy application files
+COPY --chown=app:app Gemfile.jruby-passenger Gemfile
+COPY --chown=app:app prometheus_exporter.rb .
+COPY --chown=app:app config.ru.jruby-passenger-simple config.ru
+
+# Install gems as app user
+USER app
+RUN bundle install --deployment --without development test
+USER root
+
+# Clean up and fix permissions
+RUN rm -f Gemfile.lock && \
+    chown -R app:app /home/app/webapp
+
+# Ultra-simple nginx configuration
+RUN cat > /etc/nginx/sites-available/webapp.conf << 'EOF'
+server {
+    listen 80;
+    server_name _;
+    root /home/app/webapp/public;
+    
+    passenger_enabled on;
+    passenger_ruby /usr/bin/jruby;
+    passenger_app_env production;
+    passenger_app_root /home/app/webapp;
+    passenger_spawn_method direct;
+    
+    # Enable error details for debugging
+    passenger_friendly_error_pages on;
+    
+    location / {
+        try_files $uri @app;
+    }
+    
+    location @app {
+        # Passenger handles this
+    }
+}
+EOF
+
+# Configure nginx
+RUN rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
+    rm -f /etc/service/nginx/down
+
+# Create debug startup script
+RUN cat > /etc/my_init.d/99_jruby_debug_setup.sh << 'EOF'
+#!/bin/bash
+echo "[$(date)] JRuby Debug Setup Starting..."
+
+# Show environment
+echo "Environment:"
+echo "  JRUBY_VERSION: $(jruby --version 2>/dev/null || echo 'Not found')"
+echo "  RACK_ENV: $RACK_ENV"
+echo "  PASSENGER_APP_ENV: $PASSENGER_APP_ENV"
+echo "  LOG_LEVEL: $LOG_LEVEL"
+
+# Check application directory
+echo "Application directory:"
+ls -la /home/app/webapp/
+
+# Test basic Ruby syntax
+echo "Testing application syntax..."
+cd /home/app/webapp
+su - app -c "cd /home/app/webapp && timeout 30s jruby -c prometheus_exporter.rb" || echo "Warning: App syntax check failed"
+su - app -c "cd /home/app/webapp && timeout 30s jruby -c config.ru" || echo "Warning: Config.ru syntax check failed"
+
+# Test bundle
+echo "Testing bundle..."
+su - app -c "cd /home/app/webapp && bundle exec jruby -e 'puts \"Bundle works\"'" || echo "Warning: Bundle test failed"
+
+echo "[$(date)] JRuby Debug Setup Complete"
+EOF
+
+RUN chmod +x /etc/my_init.d/99_jruby_debug_setup.sh
+
+# Test nginx configuration
+RUN nginx -t
+
+# Health check with detailed output
+HEALTHCHECK --interval=30s --timeout=15s --retries=3 --start-period=90s \
+    CMD curl -f http://localhost/health || curl -f http://localhost/ || exit 1
+
+EXPOSE 80
+CMD ["/sbin/my_init"]

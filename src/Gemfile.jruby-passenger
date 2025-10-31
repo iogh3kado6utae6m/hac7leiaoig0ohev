@@ -9,6 +9,9 @@ source 'https://rubygems.org'
 gem 'sinatra'
 gem 'rack'
 
+# JSON parsing (required by prometheus_exporter.rb)
+gem 'json'
+
 # XML parsing for passenger-status
 gem 'nokogiri'
 

@@ -1,0 +1,38 @@
+#!/usr/bin/env jruby
+# Simple config.ru for JRuby + Passenger troubleshooting
+# Minimal configuration to isolate startup issues
+
+require 'bundler/setup'
+require 'json'
+
+# Set environment
+ENV['RACK_ENV'] ||= 'production'
+
+# Load application
+require_relative 'prometheus_exporter'
+
+# Configure Sinatra for production with minimal settings
+PrometheusExporterApp.configure :production do
+  set :logging, true
+  set :dump_errors, true
+  set :show_exceptions, true
+  set :raise_errors, true
+end
+
+# Simple health check middleware
+use(Class.new do
+  def initialize(app)
+    @app = app
+  end
+  
+  def call(env)
+    if env['PATH_INFO'] == '/health'
+      [200, {'Content-Type' => 'text/plain'}, ['healthy']]
+    else
+      @app.call(env)
+    end
+  end
+end)
+
+# Main application
+run PrometheusExporterApp
