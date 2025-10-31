@@ -1,0 +1,111 @@
+# Working JRuby + Passenger + Prometheus Exporter
+# Based on proven test pattern but with full application
+
+FROM phusion/passenger-jruby94:3.0.4
+LABEL maintainer="Monitus Team"
+
+# Environment variables
+ENV RACK_ENV=production \
+    PASSENGER_APP_ENV=production \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx512M -Xms128M -XX:+UseG1GC" \
+    LOG_LEVEL=info
+
+# Create application directory
+RUN mkdir -p /home/app/webapp/public && \
+    chown -R app:app /home/app
+
+WORKDIR /home/app/webapp
+
+# Create minimal Gemfile inline (like test variant)
+RUN echo 'source "https://rubygems.org"' > Gemfile && \
+    echo 'gem "sinatra"' >> Gemfile && \
+    echo 'gem "nokogiri"' >> Gemfile && \
+    echo 'gem "json"' >> Gemfile && \
+    echo 'gem "rack"' >> Gemfile && \
+    chown app:app Gemfile
+
+# Install gems
+USER app
+RUN bundle install
+USER root
+
+# Copy the main application
+COPY --chown=app:app prometheus_exporter.rb .
+
+# Create simple config.ru (like test variant)
+RUN echo 'require "bundler/setup"' > config.ru && \
+    echo 'require "json"' >> config.ru && \
+    echo 'require_relative "prometheus_exporter"' >> config.ru && \
+    echo 'run PrometheusExporterApp' >> config.ru && \
+    chown app:app config.ru
+
+# Ultra-simple nginx configuration (like test variant)
+RUN cat > /etc/nginx/sites-available/webapp.conf << 'EOF'
+server {
+    listen 80;
+    server_name _;
+    root /home/app/webapp/public;
+    
+    passenger_enabled on;
+    passenger_ruby /usr/bin/jruby;
+    passenger_app_env production;
+    passenger_app_root /home/app/webapp;
+    
+    # Critical: JRuby doesn't support fork(), use direct spawning
+    passenger_spawn_method direct;
+    
+    location / {
+        try_files $uri @app;
+    }
+    
+    location @app {
+        # Passenger handles this
+    }
+}
+EOF
+
+# Create public directory for static files
+RUN mkdir -p /home/app/webapp/public && \
+    chown -R app:app /home/app/webapp/public
+
+# Create startup script (like test variant)
+RUN cat > /etc/my_init.d/99_jruby_working_setup.sh << 'EOF'
+#!/bin/bash
+echo "[$(date)] JRuby Working Setup Starting..."
+
+# Verify JRuby is working
+echo "JRuby version: $(jruby --version 2>/dev/null || echo 'JRuby not found')"
+
+# Test basic application loading
+cd /home/app/webapp
+echo "Testing application syntax..."
+su - app -c "cd /home/app/webapp && jruby -c prometheus_exporter.rb" || echo "Warning: App syntax check failed"
+su - app -c "cd /home/app/webapp && jruby -c config.ru" || echo "Warning: Config syntax check failed"
+
+# Check bundle
+echo "Bundle check..."
+su - app -c "cd /home/app/webapp && bundle check" || echo "Warning: Bundle check failed"
+
+# Create a simple index.html in public directory
+echo '<html><body><h1>Monitus JRuby App</h1><p>Status: <a href="/health">Health</a> | <a href="/monitus/metrics">Metrics</a> | <a href="/monitus/passenger-status">Passenger Status</a></p></body></html>' > public/index.html
+chown app:app public/index.html
+
+echo "[$(date)] JRuby Working Setup Complete"
+EOF
+
+RUN chmod +x /etc/my_init.d/99_jruby_working_setup.sh
+
+RUN rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
+    rm -f /etc/service/nginx/down
+
+# Test nginx configuration
+RUN nginx -t
+
+# Health check with longer startup period
+HEALTHCHECK --interval=20s --timeout=10s --retries=5 --start-period=60s \
+    CMD curl -f http://localhost/health || curl -f http://localhost/ || exit 1
+
+EXPOSE 80
+CMD ["/sbin/my_init"]
