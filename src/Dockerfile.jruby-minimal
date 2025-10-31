@@ -46,52 +46,17 @@ server {
     passenger_ruby /usr/bin/jruby;
     passenger_app_env production;
     passenger_app_root /home/app/webapp;
-    passenger_user app;
-    passenger_group app;
     
     # Critical: JRuby doesn't support fork(), use direct spawning
     passenger_spawn_method direct;
     
-    # Conservative settings for reliability (using open source directives only)
-    passenger_min_instances 1;
-    passenger_pool_idle_time 300;
-    passenger_startup_timeout 120;
-    # Note: passenger_max_instances requires Passenger Enterprise
-    
-    # Threading configuration (JRuby strength)
-    passenger_concurrency_model thread;
-    passenger_thread_count 8;
-    
-    # Security headers
-    add_header X-Frame-Options DENY always;
-    add_header X-Content-Type-Options nosniff always;
-    
-    # Health check endpoint (bypass Passenger for speed)
-    location = /health {
-        access_log off;
-        return 200 "healthy\n";
-        add_header Content-Type text/plain;
-    }
-    
-    # Main application routes
     location / {
-        try_files $uri @passenger;
+        try_files $uri @app;
     }
     
-    location @passenger {
+    location @app {
         # Passenger handles this
     }
-    
-    # Error pages
-    error_page 502 503 504 /50x.html;
-    location = /50x.html {
-        root /var/www/html;
-        internal;
-    }
-    
-    # Logging
-    access_log /var/log/nginx/webapp_access.log;
-    error_log /var/log/nginx/webapp_error.log;
 }
 EOF
 
