@@ -36,22 +36,35 @@ require 'json'
 - 🛠️ `debug-deployment.sh` - container troubleshooting script
 - 📊 Improved `deploy-full-monitus.sh` with better error handling
 - 🔍 Automated syntax validation and health checks
+- ✨ `test-app-syntax.sh` - test application syntax locally
+
+### 5. **Working Variant Created**
+- 📄 `Dockerfile.jruby-working` - based on proven test pattern
+- ⚙️ Inline Gemfile creation (like successful test variant)
+- 🐍 Simplified config.ru without complex middleware
+- 📊 Same pattern as working test container but with full app
 
 ## 🚀 **Next Steps: Test Deployment**
 
-### **Option 1: Re-deploy Fixed Minimal Variant**
+### **Option 1: Deploy Working Variant (Recommended)**
 ```bash
 # Stop current failing container
 docker stop monitus && docker rm monitus
 
-# Deploy with fixes
-./deploy-full-monitus.sh minimal 8080
+# Deploy working variant based on proven test pattern
+./deploy-full-monitus.sh working 8080
 ```
 
-### **Option 2: Deploy Debug Variant (Recommended)**
+### **Option 2: Re-deploy Fixed Minimal Variant**
+```bash
+# Deploy with fixes
+./deploy-full-monitus.sh minimal 8081
+```
+
+### **Option 3: Deploy Debug Variant**
 ```bash
 # Deploy debug variant with detailed error reporting
-./deploy-full-monitus.sh minimal-debug 8081
+./deploy-full-monitus.sh minimal-debug 8082
 ```
 
 ### **Option 3: Manual Troubleshooting**
