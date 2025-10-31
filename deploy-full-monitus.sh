@@ -4,8 +4,13 @@
 set -euo pipefail
 
 DOCKER_VARIANT="${1:-minimal}"
-CONTAINER_NAME="${3:-monitus}"
 PORT="${2:-8080}"
+CONTAINER_NAME="${3:-monitus}"
+
+# Use variant-specific container names to avoid conflicts
+if [[ "$DOCKER_VARIANT" == "diagnostic" ]]; then
+    CONTAINER_NAME="${3:-monitus-diagnostic}"
+fi
 
 echo "🚀 Deploying full Monitus application..."
 echo "   Variant: $DOCKER_VARIANT"

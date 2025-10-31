@@ -1,0 +1,101 @@
+# Ultra-minimal JRuby diagnostic container
+# Step-by-step build to isolate startup issues
+
+FROM phusion/passenger-jruby94:3.0.4
+LABEL maintainer="Monitus Team - Diagnostic"
+
+# Minimal environment
+ENV RACK_ENV=production \
+    PASSENGER_APP_ENV=production \
+    PASSENGER_LOG_LEVEL=3
+
+# Create application directory
+RUN mkdir -p /home/app/webapp/public && \
+    chown -R app:app /home/app
+
+WORKDIR /home/app/webapp
+
+# Step 1: Create absolute minimal Rack app inline
+RUN cat > app.rb << 'EOF'
+class DiagnosticApp
+  def call(env)
+    case env['PATH_INFO']
+    when '/health'
+      [200, {'Content-Type' => 'text/plain'}, ['healthy']]
+    when '/test'
+      [200, {'Content-Type' => 'text/plain'}, ["JRuby #{JRUBY_VERSION} OK"]]
+    when '/env'
+      [200, {'Content-Type' => 'text/plain'}, [env.inspect]]
+    else
+      [200, {'Content-Type' => 'text/html'}, ['<h1>Diagnostic App Running</h1><p><a href="/health">Health</a> | <a href="/test">Test</a> | <a href="/env">Env</a></p>']]
+    end
+  end
+end
+EOF
+
+# Step 2: Create minimal config.ru
+RUN cat > config.ru << 'EOF'
+require_relative 'app'
+run DiagnosticApp.new
+EOF
+
+# Step 3: Minimal nginx config
+RUN cat > /etc/nginx/sites-available/webapp.conf << 'EOF'
+server {
+    listen 80;
+    server_name _;
+    root /home/app/webapp/public;
+    
+    passenger_enabled on;
+    passenger_ruby /usr/bin/jruby;
+    passenger_app_env production;
+    passenger_app_root /home/app/webapp;
+    passenger_spawn_method direct;
+    passenger_friendly_error_pages on;
+    
+    location / {
+        try_files $uri @app;
+    }
+    
+    location @app {
+        # Passenger handles this
+    }
+}
+EOF
+
+# Step 4: Setup nginx
+RUN rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
+    rm -f /etc/service/nginx/down
+
+# Step 5: Diagnostic startup script
+RUN cat > /etc/my_init.d/99_diagnostic.sh << 'EOF'
+#!/bin/bash
+echo "=== DIAGNOSTIC STARTUP ==="
+echo "Date: $(date)"
+echo "JRuby: $(jruby --version 2>/dev/null || echo 'FAILED')"
+echo "App directory:"
+ls -la /home/app/webapp/
+echo "Config.ru test:"
+su - app -c "cd /home/app/webapp && jruby -c config.ru" || echo "SYNTAX ERROR"
+echo "App.rb test:"
+su - app -c "cd /home/app/webapp && jruby -c app.rb" || echo "SYNTAX ERROR"
+echo "Nginx test:"
+nginx -t || echo "NGINX ERROR"
+echo "File permissions:"
+ls -la /home/app/webapp/
+chown -R app:app /home/app/webapp/
+echo "=== DIAGNOSTIC COMPLETE ==="
+EOF
+
+RUN chmod +x /etc/my_init.d/99_diagnostic.sh
+
+# Test nginx config
+RUN nginx -t
+
+# Longer health check for debugging
+HEALTHCHECK --interval=30s --timeout=15s --retries=3 --start-period=120s \
+    CMD curl -f http://localhost/health || curl -f http://localhost/ || exit 1
+
+EXPOSE 80
+CMD ["/sbin/my_init"]
