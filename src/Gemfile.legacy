@@ -1,13 +1,25 @@
 # Gemfile for Ruby 2.3.8 - use with BUNDLE_GEMFILE=Gemfile.legacy
+# Note: This is for compatibility testing only. Use Ruby 3.2+ for production.
 source 'https://rubygems.org'
 
 ruby '2.3.8'
 
-# Legacy-compatible versions
-gem 'nokogiri', '~> 1.10.10'  # Last version supporting Ruby 2.3.8
-gem 'sinatra', '~> 2.0.8'     # Compatible with Ruby 2.3.8
-gem 'rack', '~> 2.0.9'        # Core dependency
-gem 'puma', '~> 3.12.6'       # Compatible with Ruby 2.3.8
-gem 'json', '~> 2.3.1'        # May be needed for older Ruby
+# Essential gems only (minimal to reduce compilation issues)
+gem 'sinatra', '~> 2.0.8'     # Core web framework - compatible with Ruby 2.3.8
+gem 'rack', '~> 2.0.9'        # Core dependency - stable version
+gem 'json', '~> 2.3.1'        # JSON support - may be needed explicitly
 
-# rackup functionality is built into rack for Ruby 2.3.8
+# Optional gems (may fail on some systems due to compilation)
+group :optional do
+  gem 'nokogiri', '~> 1.10.10'  # XML parsing - last version supporting Ruby 2.3.8
+  gem 'puma', '~> 3.12.6'       # Web server - compatible but may have security issues
+end
+
+# Development/test dependencies for Ruby 2.3.8
+group :development, :test do
+  gem 'minitest', '~> 5.11'     # Test framework compatible with Ruby 2.3.8
+  gem 'rake', '~> 12.3'         # Task runner
+end
+
+# Note: rackup functionality is built into rack gem for Ruby 2.3.8
+# Note: This configuration prioritizes compatibility over security/performance
