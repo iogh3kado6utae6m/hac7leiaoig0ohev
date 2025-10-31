@@ -156,20 +156,86 @@ class PrometheusExporterApp < Sinatra::Base
 
   get '/monitus/passenger-status' do
     content_type :text
-    result = `/usr/sbin/passenger-status --verbose`
-    return result
+    # Try multiple possible passenger-status locations for Docker compatibility
+    passenger_status_cmd = nil
+    [
+      '/usr/bin/passenger-status',
+      '/usr/sbin/passenger-status',
+      '/usr/local/bin/passenger-status',
+      'passenger-status'  # fallback to PATH
+    ].each do |cmd|
+      if File.executable?(cmd) || system("which #{cmd.split.first} >/dev/null 2>&1")
+        passenger_status_cmd = cmd
+        break
+      end
+    end
+    
+    if passenger_status_cmd
+      result = `#{passenger_status_cmd} --verbose 2>/dev/null`
+      if $?.success? && !result.strip.empty?
+        return result
+      else
+        return "Error: passenger-status command failed or returned empty result\nTried: #{passenger_status_cmd}"
+      end
+    else
+      return "Error: passenger-status command not found in any of the expected locations\nSearched: /usr/bin/, /usr/sbin/, /usr/local/bin/, PATH"
+    end
   end
 
   get '/monitus/passenger-config_system-metrics' do
     content_type :text
-    result = `/usr/bin/passenger-config system-metrics`
-    return result
+    # Try multiple possible passenger-config locations for Docker compatibility
+    passenger_config_cmd = nil
+    [
+      '/usr/bin/passenger-config',
+      '/usr/sbin/passenger-config',
+      '/usr/local/bin/passenger-config',
+      'passenger-config'  # fallback to PATH
+    ].each do |cmd|
+      if File.executable?(cmd) || system("which #{cmd.split.first} >/dev/null 2>&1")
+        passenger_config_cmd = cmd
+        break
+      end
+    end
+    
+    if passenger_config_cmd
+      result = `#{passenger_config_cmd} system-metrics 2>/dev/null`
+      if $?.success?
+        return result.empty? ? "No system metrics available" : result
+      else
+        return "Error: passenger-config system-metrics command failed\nTried: #{passenger_config_cmd}"
+      end
+    else
+      return "Error: passenger-config command not found"
+    end
   end
 
   get '/monitus/passenger-config_system-properties' do
     content_type :json
-    result = `/usr/bin/passenger-config system-properties`
-    return result
+    # Try multiple possible passenger-config locations for Docker compatibility
+    passenger_config_cmd = nil
+    [
+      '/usr/bin/passenger-config',
+      '/usr/sbin/passenger-config', 
+      '/usr/local/bin/passenger-config',
+      'passenger-config'  # fallback to PATH
+    ].each do |cmd|
+      if File.executable?(cmd) || system("which #{cmd.split.first} >/dev/null 2>&1")
+        passenger_config_cmd = cmd
+        break
+      end
+    end
+    
+    if passenger_config_cmd
+      result = `#{passenger_config_cmd} system-properties 2>/dev/null`
+      if $?.success?
+        return result.empty? ? "{}" : result
+      else
+        return '{"error": "passenger-config system-properties command failed"}'
+      end
+    else
+      return '{"error": "passenger-config command not found"}'
+    end
   end
 
   get '/monitus/passenger-memory-stats' do
@@ -180,8 +246,30 @@ class PrometheusExporterApp < Sinatra::Base
 
   get '/monitus/passenger-config_api-call_get_pool' do
     content_type :json
-    result = `/usr/bin/passenger-config api-call get /pool.json`
-    return result
+    # Try multiple possible passenger-config locations for Docker compatibility
+    passenger_config_cmd = nil
+    [
+      '/usr/bin/passenger-config',
+      '/usr/sbin/passenger-config',
+      '/usr/local/bin/passenger-config', 
+      'passenger-config'  # fallback to PATH
+    ].each do |cmd|
+      if File.executable?(cmd) || system("which #{cmd.split.first} >/dev/null 2>&1")
+        passenger_config_cmd = cmd
+        break
+      end
+    end
+    
+    if passenger_config_cmd
+      result = `#{passenger_config_cmd} api-call get /pool.json 2>/dev/null`
+      if $?.success?
+        return result.empty? ? "{}" : result
+      else
+        return '{"error": "passenger-config api-call failed"}'
+      end
+    else
+      return '{"error": "passenger-config command not found"}'
+    end
   end
 
   get '/monitus/debug-passenger-status-json' do
@@ -192,9 +280,31 @@ class PrometheusExporterApp < Sinatra::Base
 
   get '/monitus/passenger-config_api-call_get_server' do
     content_type :json
-    result = `/usr/bin/passenger-config api-call get /server.json` # Need `sudo`
-    return {:error => 'Unauthorized'}.to_json if result.include?('Unauthorized')
-    return result
+    # Try multiple possible passenger-config locations for Docker compatibility
+    passenger_config_cmd = nil
+    [
+      '/usr/bin/passenger-config',
+      '/usr/sbin/passenger-config',
+      '/usr/local/bin/passenger-config',
+      'passenger-config'  # fallback to PATH
+    ].each do |cmd|
+      if File.executable?(cmd) || system("which #{cmd.split.first} >/dev/null 2>&1")
+        passenger_config_cmd = cmd
+        break
+      end
+    end
+    
+    if passenger_config_cmd
+      result = `#{passenger_config_cmd} api-call get /server.json 2>/dev/null`
+      if $?.success?
+        return {:error => 'Unauthorized'}.to_json if result.include?('Unauthorized')
+        return result.empty? ? "{}" : result
+      else
+        return '{"error": "passenger-config api-call failed (may need sudo)"}'
+      end
+    else
+      return '{"error": "passenger-config command not found"}'
+    end
   end
 
   def passenger_prometheus_metrics # Return passenger-status metrics in a Prometheus format
