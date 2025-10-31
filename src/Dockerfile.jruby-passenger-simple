@@ -45,10 +45,12 @@ COPY --chown=app:app . .
 # Remove conflicting lockfiles
 RUN rm -f Gemfile.lock
 
-# Copy Nginx configuration
+# Copy Nginx configuration with JRuby optimizations
 COPY nginx-jruby.conf /etc/nginx/sites-available/webapp.conf
 RUN rm -f /etc/nginx/sites-enabled/default && \
-    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
+    # Verify nginx configuration
+    nginx -t
 
 # Configure Passenger to use JRuby
 RUN echo 'passenger_ruby /usr/bin/jruby;' > /etc/nginx/conf.d/passenger-jruby.conf

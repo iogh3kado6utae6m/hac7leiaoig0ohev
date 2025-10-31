@@ -66,8 +66,12 @@ analyze_dockerfile() {
     
     if grep -q 'passenger_spawn_method.*direct' "$dockerfile"; then
         echo "  ✅ Correct spawn method for JRuby (direct)"
-    else
+    elif grep -q 'nginx-jruby.conf' "$dockerfile" && [ -f "src/nginx-jruby.conf" ] && grep -q 'passenger_spawn_method direct' "src/nginx-jruby.conf"; then
+        echo "  ✅ Correct spawn method for JRuby (via nginx-jruby.conf)"
+    elif grep -q 'passenger' "$dockerfile"; then
         echo "  ⚠️  Should use 'direct' spawn method for JRuby"
+    else
+        echo "  ✅ No Passenger (standalone JRuby - spawn method not applicable)"
     fi
     
     # Health check
@@ -77,8 +81,8 @@ analyze_dockerfile() {
         echo "  ⚠️  No health check configured"
     fi
     
-    # Package issues
-    if grep -q 'libnginx-mod-http-passenger' "$dockerfile"; then
+    # Package issues (ignore comments)
+    if grep -v '^[[:space:]]*#' "$dockerfile" | grep -q 'libnginx-mod-http-passenger'; then
         echo "  ❌ ISSUE: Uses problematic libnginx-mod-http-passenger package"
         echo "     FIX: Install Passenger repository and use 'passenger' package"
     fi
@@ -90,10 +94,23 @@ analyze_dockerfile() {
 echo "🏗️  Dockerfile Analysis"
 echo "===================="
 
-# Analyze different JRuby Dockerfiles
+# Analyze different JRuby Dockerfiles (avoid duplicates)
+analyzed_files=()
 for dockerfile in src/Dockerfile.jruby* src/Dockerfile.*jruby*; do
     if [ -f "$dockerfile" ]; then
-        analyze_dockerfile "$dockerfile"
+        # Check if already analyzed
+        skip=false
+        for analyzed in "${analyzed_files[@]}"; do
+            if [ "$dockerfile" = "$analyzed" ]; then
+                skip=true
+                break
+            fi
+        done
+        
+        if [ "$skip" = false ]; then
+            analyze_dockerfile "$dockerfile"
+            analyzed_files+=("$dockerfile")
+        fi
     fi
 done
 

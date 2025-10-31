@@ -92,13 +92,19 @@ RUN set -e && \
     # Set JRuby as default
     bash -lc "rvm use $RVM_ID --default"
 
-# Install Nginx + Passenger
+# Install Nginx + Passenger (fixed for Ubuntu Noble)
 RUN set -e && \
-    # Install Phusion Passenger
+    # Add Passenger repository for Ubuntu Noble
+    curl https://oss-binaries.phusionpassenger.com/auto-software-signing-gpg-key.txt | gpg --dearmor | tee /etc/apt/trusted.gpg.d/phusion.gpg >/dev/null && \
+    echo 'deb https://oss-binaries.phusionpassenger.com/apt/passenger noble main' > /etc/apt/sources.list.d/passenger.list && \
     apt-get update && \
-    apt-get install -y nginx passenger libnginx-mod-http-passenger && \
-    # Configure Nginx to load Passenger module
-    sed -i '/include \/etc\/nginx\/modules-enabled\/\*.conf;/i include /usr/share/nginx/modules-available/mod-http-passenger.load;' /etc/nginx/nginx.conf && \
+    # Install nginx-extras (includes modules) and passenger
+    apt-get install -y nginx-extras passenger && \
+    # Enable Passenger module
+    echo 'load_module modules/ngx_http_passenger_module.so;' > /etc/nginx/modules-enabled/50-mod-http-passenger.conf && \
+    # Configure Passenger in nginx.conf
+    echo 'passenger_root /usr/lib/ruby/vendor_ruby/phusion_passenger/locations.ini;' >> /etc/nginx/nginx.conf && \
+    echo 'passenger_ruby /usr/bin/jruby;' >> /etc/nginx/nginx.conf && \
     rm -rf /var/lib/apt/lists/*
 
 # Precompile Passenger native support for JRuby

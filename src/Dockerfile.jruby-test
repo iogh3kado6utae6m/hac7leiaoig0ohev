@@ -4,9 +4,12 @@
 FROM phusion/passenger-jruby94:3.0.4
 LABEL maintainer="Monitus Team"
 
-# Environment variables
+# Environment variables with JRuby optimizations
 ENV RACK_ENV=production \
-    PASSENGER_APP_ENV=production
+    PASSENGER_APP_ENV=production \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx512M -Xms128M -XX:+UseG1GC" \
+    LOG_LEVEL=info
 
 # Create application directory
 RUN mkdir -p /home/app/webapp && \
