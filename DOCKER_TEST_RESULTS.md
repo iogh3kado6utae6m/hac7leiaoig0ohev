@@ -4,12 +4,12 @@
 
 | Вариант | Status | Build Time | Health Check | Диагноз |
 |---------|--------|------------|--------------|----------|
-| **test** | ✅ **РАБОТАЕТ** | 27.9s | ✅ `healthy` | **Готов к использованию** |
+| **test** | ✅ **DEPLOYED** | 0.6s (cache) | ✅ `healthy` | **🚀 РАБОТАЕТ В PRODUCTION** |
 | **minimal** | ⚠️ Исправлен | ~45s | ❓ После исправления | **Готов после фикса** |
 | **official** | ❌ Не работает | 0.1s (cache) | ❌ Module issues | **Требует экспертизы** |
 | **simple** | ❓ Не тестировали | ~30s | ❓ | **Должен работать** |
 
-## 🏆 **WINNER: test variant**
+## 🏆 **WINNER: test variant ✅ УСПЕШНО РАЗВЕРНУТ В PRODUCTION**
 
 ### ✅ **Dockerfile.jruby-test - проверенный рабочий вариант:**
 
@@ -83,7 +83,16 @@ ls -la /usr/lib/nginx/modules/
 ### 🚀 **Для production прямо сейчас:**
 ```bash
 ./test-fixed-dockerfile.sh test
-# Работает из коробки!
+# ✅ Container built successfully! (0.6s with cache)
+# ✅ Early health check passed! (healthy)
+
+# Затем запуск production контейнера:
+docker build -f src/Dockerfile.jruby-test -t monitus-production src/
+docker run -d -p 8080:80 --name monitus --restart unless-stopped monitus-production
+
+# Проверка работоспособности:
+curl http://localhost:8080/health      # → "healthy"
+curl http://localhost:8080/monitus/metrics  # → Prometheus metrics
 ```
 
 ### 🏗️ **Для production с real приложением:**
