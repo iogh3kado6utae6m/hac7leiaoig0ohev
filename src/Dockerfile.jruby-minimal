@@ -52,11 +52,11 @@ server {
     # Critical: JRuby doesn't support fork(), use direct spawning
     passenger_spawn_method direct;
     
-    # Conservative settings for reliability
+    # Conservative settings for reliability (using open source directives only)
     passenger_min_instances 1;
-    passenger_max_instances 3;
     passenger_pool_idle_time 300;
     passenger_startup_timeout 120;
+    # Note: passenger_max_instances requires Passenger Enterprise
     
     # Threading configuration (JRuby strength)
     passenger_concurrency_model thread;
