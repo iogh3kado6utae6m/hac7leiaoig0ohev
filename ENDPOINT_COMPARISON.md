@@ -34,9 +34,12 @@ You're getting "Not Found" for `/monitus/passenger-status` because you're runnin
 
 ## 🔧 **Solution: Deploy Full Application**
 
+### ✅ **FIXED**: Nginx Configuration Issues Resolved
+The minimal variant Dockerfile had problematic Passenger directives that caused build failures. This has been fixed!
+
 ### Option 1: Quick Deploy Script
 ```bash
-# Deploy minimal variant with full application
+# Deploy minimal variant with full application (now fixed!)
 ./deploy-full-monitus.sh minimal 8080
 
 # Or deploy to different port to compare
