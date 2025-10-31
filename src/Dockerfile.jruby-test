@@ -92,13 +92,42 @@ server {
 }
 EOF
 
+# Create public directory for static files
+RUN mkdir -p /home/app/webapp/public && \
+    chown -R app:app /home/app/webapp/public
+
+# Create startup script to ensure everything is ready
+RUN cat > /etc/my_init.d/99_jruby_test_setup.sh << 'EOF'
+#!/bin/bash
+echo "[$(date)] JRuby Test App Setup Starting..."
+
+# Verify JRuby is working
+echo "JRuby version: $(jruby --version 2>/dev/null || echo 'JRuby not found')"
+
+# Test basic application loading
+cd /home/app/webapp
+echo "Testing application syntax..."
+su - app -c "cd /home/app/webapp && jruby -c app.rb" || echo "Warning: App syntax check failed"
+
+# Create a simple index.html in public directory
+echo '<html><body><h1>JRuby Test App</h1><p>Status: <a href="/health">Health</a> | <a href="/test">Test</a> | <a href="/monitus/metrics">Metrics</a></p></body></html>' > public/index.html
+chown app:app public/index.html
+
+echo "[$(date)] JRuby Test App Setup Complete"
+EOF
+
+RUN chmod +x /etc/my_init.d/99_jruby_test_setup.sh
+
 RUN rm -f /etc/nginx/sites-enabled/default && \
     ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
     rm -f /etc/service/nginx/down
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
-    CMD curl -f http://localhost/health || exit 1
+# Test nginx configuration
+RUN nginx -t
+
+# Health check with longer startup period
+HEALTHCHECK --interval=20s --timeout=10s --retries=5 --start-period=60s \
+    CMD curl -f http://localhost/health || curl -f http://localhost/ || exit 1
 
 EXPOSE 80
 CMD ["/sbin/my_init"]

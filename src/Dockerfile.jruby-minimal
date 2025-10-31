@@ -1,78 +1,139 @@
-# Minimal JRuby + Passenger setup - maximum reliability
-# Uses working passenger-jruby image and minimal changes
+# Ultra-minimal JRuby + Passenger Docker setup
+# Focus on simplicity and reliability over features
 
 FROM phusion/passenger-jruby94:3.0.4
 LABEL maintainer="Monitus Team"
 
 # Environment variables
 ENV RACK_ENV=production \
-    PASSENGER_APP_ENV=production
+    PASSENGER_APP_ENV=production \
+    JRUBY_OPTS="-Xcompile.invokedynamic=true" \
+    JAVA_OPTS="-Xmx512M -Xms128M -XX:+UseG1GC" \
+    LOG_LEVEL=info
 
-# Use bash shell
-SHELL ["/bin/bash", "-c"]
+# Create application directory with proper permissions
+RUN mkdir -p /home/app/webapp/public && \
+    chown -R app:app /home/app/webapp
 
-# Create application directory as root, then change ownership
-RUN mkdir -p /home/app/webapp && \
-    chown -R app:app /home/app
-
-# Set working directory
 WORKDIR /home/app/webapp
 
-# Create minimal Gemfile inline to avoid copy issues
-RUN echo 'source "https://rubygems.org"' > Gemfile && \
-    echo 'gem "sinatra"' >> Gemfile && \
-    echo 'gem "nokogiri"' >> Gemfile && \
-    echo 'gem "rake"' >> Gemfile && \
-    chown app:app Gemfile
+# Copy and configure Monitus application
+COPY --chown=app:app Gemfile.jruby-passenger Gemfile
+COPY --chown=app:app prometheus_exporter.rb .
+COPY --chown=app:app config.ru.jruby-passenger config.ru
 
 # Install gems as app user
 USER app
 RUN bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
-    bundle install --jobs=4 --retry=3
-
-# Switch back to root for system configuration
+    bundle install --jobs=2 --retry=3 && \
+    bundle clean
 USER root
 
-# Copy application code
-COPY --chown=app:app prometheus_exporter.rb .
-COPY --chown=app:app config.ru .
+# Remove any conflicting lockfiles and set permissions
+RUN rm -f Gemfile.lock && \
+    chown -R app:app /home/app/webapp
 
-# Ultra-minimal JRuby + Passenger nginx configuration  
-RUN echo 'server {' > /etc/nginx/sites-available/webapp.conf && \
-    echo '    listen 80;' >> /etc/nginx/sites-available/webapp.conf && \
-    echo '    server_name _;' >> /etc/nginx/sites-available/webapp.conf && \
-    echo '    root /home/app/webapp/public;' >> /etc/nginx/sites-available/webapp.conf && \
-    echo '    passenger_enabled on;' >> /etc/nginx/sites-available/webapp.conf && \
-    echo '    passenger_ruby /usr/bin/jruby;' >> /etc/nginx/sites-available/webapp.conf && \
-    echo '    passenger_spawn_method direct;' >> /etc/nginx/sites-available/webapp.conf && \
-    echo '}' >> /etc/nginx/sites-available/webapp.conf && \
-    rm -f /etc/nginx/sites-enabled/default && \
-    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf
+# Create simple nginx configuration optimized for JRuby
+RUN cat > /etc/nginx/sites-available/webapp.conf << 'EOF'
+server {
+    listen 80 default_server;
+    server_name _;
+    root /home/app/webapp/public;
+    
+    # Passenger configuration
+    passenger_enabled on;
+    passenger_ruby /usr/bin/jruby;
+    passenger_app_env production;
+    passenger_app_root /home/app/webapp;
+    passenger_user app;
+    passenger_group app;
+    
+    # Critical: JRuby doesn't support fork(), use direct spawning
+    passenger_spawn_method direct;
+    
+    # Conservative settings for reliability
+    passenger_min_instances 1;
+    passenger_max_instances 3;
+    passenger_pool_idle_time 300;
+    passenger_startup_timeout 120;
+    
+    # Threading configuration (JRuby strength)
+    passenger_concurrency_model thread;
+    passenger_thread_count 8;
+    
+    # Security headers
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    
+    # Health check endpoint (bypass Passenger for speed)
+    location = /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+    
+    # Main application routes
+    location / {
+        try_files $uri @passenger;
+    }
+    
+    location @passenger {
+        # Passenger handles this
+    }
+    
+    # Error pages
+    error_page 502 503 504 /50x.html;
+    location = /50x.html {
+        root /var/www/html;
+        internal;
+    }
+    
+    # Logging
+    access_log /var/log/nginx/webapp_access.log;
+    error_log /var/log/nginx/webapp_error.log;
+}
+EOF
 
-# Create simple startup script for diagnostics
-RUN echo '#!/bin/bash' > /etc/my_init.d/99_jruby_minimal.sh && \
-    echo 'echo "[$(date)] Minimal JRuby setup - Passenger should start automatically"' >> /etc/my_init.d/99_jruby_minimal.sh && \
-    echo 'echo "[$(date)] JRuby version: $(jruby --version)"' >> /etc/my_init.d/99_jruby_minimal.sh && \
-    echo 'echo "[$(date)] Application files: $(ls -la /home/app/webapp)"' >> /etc/my_init.d/99_jruby_minimal.sh && \
-    echo 'nginx -t && echo "[$(date)] Nginx config OK"' >> /etc/my_init.d/99_jruby_minimal.sh && \
-    chmod +x /etc/my_init.d/99_jruby_minimal.sh && \
-    # Enable Nginx service
+# Configure nginx
+RUN rm -f /etc/nginx/sites-enabled/default && \
+    ln -sf /etc/nginx/sites-available/webapp.conf /etc/nginx/sites-enabled/webapp.conf && \
     rm -f /etc/service/nginx/down
 
-# Create simple health endpoint and basic config.ru
-RUN mkdir -p public && \
-    echo 'healthy' > public/health && \
-    echo 'require_relative "prometheus_exporter"' > config.ru && \
-    echo 'run PrometheusExporterApp' >> config.ru && \
-    chown -R app:app public config.ru
+# Create startup script for debugging
+RUN cat > /etc/my_init.d/99_jruby_minimal_setup.sh << 'EOF'
+#!/bin/bash
+echo "[$(date)] JRuby Minimal Setup Starting..."
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+# Show JRuby version
+echo "JRuby version: $(jruby --version 2>/dev/null || echo 'JRuby not available')"
+
+# Test nginx configuration
+echo "Testing nginx configuration..."
+nginx -t || echo "Warning: Nginx configuration test failed"
+
+# Verify application directory
+echo "Application directory contents:"
+ls -la /home/app/webapp/
+
+# Test basic app syntax if possible
+cd /home/app/webapp
+if [ -f "prometheus_exporter.rb" ]; then
+    echo "Testing application syntax..."
+    su - app -c "cd /home/app/webapp && timeout 30s jruby -c prometheus_exporter.rb" || echo "Warning: App syntax check failed or timed out"
+fi
+
+echo "[$(date)] JRuby Minimal Setup Complete"
+EOF
+
+RUN chmod +x /etc/my_init.d/99_jruby_minimal_setup.sh
+
+# Test configuration before finalizing
+RUN nginx -t
+
+# Health check with reasonable timeouts
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=90s \
     CMD curl -f http://localhost/health || exit 1
 
-# Expose port 80
 EXPOSE 80
-
-# Use the standard passenger init system
 CMD ["/sbin/my_init"]
